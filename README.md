@@ -16,6 +16,16 @@
 - REGISTER_KERNEL(カーネル名，関数名)でカーネルを登録．C++の場合は関数名に注意．extern "C" しておくのが良い
 
 
+### TF側コード
+
+```
+    VEDeviceContext* vectx = ctx->op_device_context<VEDeviceContext>();
+    Status s = vectx->Compute("Conv2D", (void*)&p, sizeof(p));
+```
+
+
+### VE側コード(libvetfkernelで実装）
+
 ```
 #include "kernel.h"
 
