@@ -16,7 +16,7 @@
 - REGISTER_KERNEL(カーネル名，関数名)でカーネルを登録．C++の場合は関数名に注意．extern "C" しておくのが良い
 
 
-~~~
+```
 #include "kernel.h"
 
 REGISTER_KENREL("Conv2D", "conv2d")
@@ -28,4 +28,4 @@ extern "C" {
 int conv2d(const void* args, size_t len) {
     ....
 }
-~~~~
+```
