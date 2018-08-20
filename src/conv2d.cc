@@ -1,15 +1,16 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <cassert>
 
-int conv2d(const void* arg);
+#include "kernel.h"
+
+REGISTER_KERNEL("Conv2D", "conv2d");
 
 extern "C" {
-    //int conv2d(void* arg);
-    int compute(int kernelId, const void* arg, size_t len);
+    int conv2d(const void* arg, size_t len);
 }
 
-#if 0
 struct TensorParam {
     int w, h, c, n;
 };
@@ -33,9 +34,10 @@ struct ConvParam {
     int data_format;
 };
 
-int conv2d(const void* arg)
+int conv2d(const void* arg, size_t len)
 {
     fprintf(stderr, "conv2d\n");
+    assert(len == sizeof(ConvParam));
     const ConvParam& p = *(ConvParam*)arg;
 
     fprintf(stderr, "conv2d: data_format=%d data_type=%d\n", p.data_format, p.data_type);
@@ -71,7 +73,7 @@ int conv2d(const void* arg)
                         if (x0 <  W)
                             inv = in[(y + Q - q - 1) * W + (x + P - p - 1)];
                         s += inv * filter[p * Q + q];
-                        fprintf(stderr, "(%d,%d) * (%d,%d) = %f * %f\n", (x+q), (y+p), q, p, in[(y+p)*W+(x+q)], filter[p*Q+q]);
+                        fprintf(stderr, "(%d,%d) * (%d,%d) = %f * %f\n", (x+P-p-1), (y+Q-q-1), q, p, inv, filter[p*Q+q]);
                     }
                 }
                 out[y * W + x] = s;
@@ -90,12 +92,4 @@ int conv2d(const void* arg)
 
 
     return 1976;
-}
-#endif
-
-int compute(int kernelId, const void* arg, size_t len)
-{
-    fprintf(stderr, "libvetfkernel::compute: kernelId=%d\n", kernelId);
-    conv2d(arg);
-    return 0;
 }
