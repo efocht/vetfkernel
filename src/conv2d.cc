@@ -90,6 +90,5 @@ int conv2d(const void* arg, size_t len)
     memcpy((void*)p.out, tmp, 9);
 #endif
 
-
-    return 1976;
+    return 0;
 }
