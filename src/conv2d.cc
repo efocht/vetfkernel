@@ -30,8 +30,8 @@ struct ConvParam {
     int row_padding;
     int col_padding;
 
-    int data_type;
     int data_format;
+    int data_type;
 };
 
 int conv2d(const void* arg, size_t len)
@@ -52,12 +52,12 @@ int conv2d(const void* arg, size_t len)
 
     int W = p.out_param.w;
     int H = p.out_param.h;
-    int P = p.filter_param.h;
-    int Q = p.filter_param.w;
+    int KW = p.filter_param.w;
+    int KH = p.filter_param.h;
 
-    fprintf(stderr, "conv2d: W=%d H=%d P=%d Q=%d\n", W, H, P, Q);
+    fprintf(stderr, "conv2d: W=%d H=%d P=%d Q=%d\n", W, H, KW, KH);
 
-    if (p.data_type == 0) { // float
+    if (p.data_type == 1) { // float
         const float* in = (float*)p.in;
         const float* filter = (float*)p.filter;
         float* out = (float*)p.out;
@@ -65,15 +65,15 @@ int conv2d(const void* arg, size_t len)
         for (int y = 0; y < H; ++y) {
             for (int x = 0; x < W; ++x) {
                 float s = 0.0f;
-                for (int p = 0; p < P; ++p) { // height
-                    for (int q = 0; q < Q; ++q) { // width
-                        int x0 = x + P - p - 1;
-                        int y0 = y + Q - q - 1;
+                for (int ky = 0; ky < KH; ++ky) { // height
+                    for (int kx = 0; kx < KW; ++kx) { // width
+                        int x0 = x + kx;
+                        int y0 = y + ky;
                         float inv = 0.0f;
                         if (x0 <  W)
-                            inv = in[(y + Q - q - 1) * W + (x + P - p - 1)];
-                        s += inv * filter[p * Q + q];
-                        fprintf(stderr, "(%d,%d) * (%d,%d) = %f * %f\n", (x+P-p-1), (y+Q-q-1), q, p, inv, filter[p*Q+q]);
+                            inv = in[y0 * W + x0];
+                        s += inv * filter[kx * KH + ky];
+                        fprintf(stderr, "(%d,%d) * (%d,%d) = %f * %f\n", x0, y0, kx, ky, inv, filter[kx*KH+ky]);
                     }
                 }
                 out[y * W + x] = s;
