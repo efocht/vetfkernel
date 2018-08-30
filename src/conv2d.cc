@@ -125,11 +125,11 @@ int conv2d(const void* arg, size_t len)
     ParamConv.dilationWidth  = p.col_dilation ; 
     ParamConv.dilationHeight = p.row_dilation ; 
 
-    vednnConvolution(&ParamIn,     pIn,
-                     &ParamFilter, pFilter,
-                     &ParamOut,    pOut, 
-                     &ParamConv,
-                     VEDNN_CONV_ALGORITHM_DIRECT );
+    vednnConvolutionForward(&ParamIn,     pIn,
+                     	    &ParamFilter, pFilter,
+                     	    &ParamOut,    pOut, 
+                     	    &ParamConv,
+                     	    VEDNN_CONV_ALGORITHM_DIRECT );
     
 
     if( transformed_filter != NULL ) free(transformed_filter) ;

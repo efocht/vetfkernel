@@ -11,7 +11,7 @@ add_library(vetfkernel SHARED
 
 target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH})
 
-find_library(vednn libvednn.a ${VEDNN_PATH})
+find_library(vednn libvednn.so ${VEDNN_PATH})
 target_link_libraries(vetfkernel ${vednn})
 
 add_subdirectory(fake)
