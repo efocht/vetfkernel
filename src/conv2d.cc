@@ -62,9 +62,9 @@ int conv2d(const void* arg, size_t len)
             p.filter_param.n, p.filter_param.c, p.filter_param.h, p.filter_param.w ) ;
 
     fprintf(stderr, "conv2d: stride=%dx%d dilation=%dx%d padding=%dx%d\n", 
-            p.row_stride,   p.col_stride,
-            p.row_dilation, p.col_dilation,
-            p.row_padding,   p.col_padding);
+            p.col_stride,   p.row_stride,
+            p.col_dilation, p.row_dilation,
+            p.col_padding,   p.row_padding);
 #endif
      
     float * transformed_filter = NULL ;
