@@ -33,7 +33,7 @@ uint64_t get_kernel_table_addr()
 void register_kernel(char const* name, char const* func)
 {
     // FIXME: check MAX_KERNEL
-    fprintf(stderr, "register_kernel: kernel_index=%d\n", kernel_index);
+    fprintf(stderr, "libvetfkernel::register_kernel: kernel_index=%d name=%s func=%p\n", kernel_index, name, func);
     Kernel& k = table_[kernel_index++];
 
     strcpy(k.name, name);

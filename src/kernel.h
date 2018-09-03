@@ -3,12 +3,20 @@
 
 extern void register_kernel(char const* name, char const* func);
 
+class Register {
+  public:
+    typedef void (*Func)(void);
+    Register(Func func) {
+      func();
+    }
+};
+
+#define REGISTER_KERNEL_HELPER(ctr, name, func) \
+  static Register __register__##ctr([]() { \
+    register_kernel(name, func); \
+  });
+
 #define REGISTER_KERNEL(name, func) \
-    class __register_##__COUNTER__ { \
-        public: \
-            __register_##__COUNTER__() { \
-                register_kernel(name, func); \
-            } \
-    } __register_##__COUNTER__; \
+  REGISTER_KERNEL_HELPER(__COUNTER__, name, func)
 
 #endif
