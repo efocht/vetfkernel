@@ -11,8 +11,10 @@ class Register {
     }
 };
 
+#define MAKE_NAME(a, b) a##b
+
 #define REGISTER_KERNEL_HELPER(ctr, name, func) \
-  static Register __register__##ctr([]() { \
+  static Register MAKE_NAME(__register, ctr)([]() { \
     register_kernel(name, func); \
   });
 
