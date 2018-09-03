@@ -10,7 +10,8 @@ set(VEDNN_PATH ${CMAKE_SOURCE_DIR}/vednn)
 add_library(vetfkernel SHARED 
 	src/libvetfkernel.cc
 	src/conv2d.cc
-	src/conv2d_backprop_filter.cc)
+	src/conv2d_backprop_filter.cc
+        src/ops.cc)
 
 target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH})
 
