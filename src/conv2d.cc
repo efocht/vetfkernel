@@ -9,8 +9,6 @@
 
 #include "kernel.h"
 
-#define _DEBUG
-
 REGISTER_KERNEL("Conv2D", "conv2d");
 
 extern "C" {
