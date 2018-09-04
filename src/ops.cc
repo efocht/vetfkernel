@@ -3,6 +3,7 @@
 #include <iostream>
 #include "kernel.h"
 #include "types.h"
+#include "log.h"
 
 REGISTER_KERNEL("Fill", "ops_fill");
 REGISTER_KERNEL("AddN", "ops_AddN");
@@ -16,7 +17,7 @@ namespace {
 template <typename T>
   int fill(const void* args, size_t len)
   {
-    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
+    LOG(2) << __PRETTY_FUNCTION__;
     struct Args {
       int data_type;
       uint64_t in;
@@ -25,22 +26,26 @@ template <typename T>
     } const* p;
 
     if (len != sizeof(*p)) {
-      fprintf(stderr, "%s: illegal argument lenght: %ld expected but %ld\n", sizeof(*p), len);
+      fprintf(stderr, "%s: illegal argument lenght: %ld expected but %ld\n",
+              sizeof(*p), len);
       return 1;
     }
 
     p = reinterpret_cast<const Args*>(args);
-    fprintf(stderr, "%s: data_type=%d out=%016lx num_elems=%lu\n", __FUNCTION__, p->data_type, p->out, p->num_elems);
+#if 0
+    LOG(2, "%s: data_type=%d out=%016lx num_elems=%lu\n",
+          __FUNCTION__, p->data_type, p->out, p->num_elems);
+#endif
 
     const T* in = (T*)p->in;
     T* out = (T*)p->out;
 
-    std::cerr << __FUNCTION__ << ": value=" << *in << std::endl;
+    LOG(2) << __FUNCTION__ << ": value=" << *in;
 
     for (size_t i = 0; i < p->num_elems; ++i)
       out[i] = *in;
 
-    fprintf(stderr, "%s: done\n", __PRETTY_FUNCTION__);
+    LOG(2) << __PRETTY_FUNCTION__ << ": done";
     return 0;
   }
 }
@@ -49,9 +54,9 @@ template <typename T>
 
 int ops_fill(const void* args, size_t len)
 {
-  fprintf(stderr, "%s\n", __FUNCTION__);
+  LOG(1) << __FUNCTION__;
   int dtype = DATA_TYPE(args);
-  fprintf(stderr, "%s: dtype=%d\n", __FUNCTION__, dtype);
+  LOG(2) << __FUNCTION__ << ": dtype=" << dtype;
 
   if (dtype == DT_FLOAT) {
     return fill<float>(args, len);
@@ -85,7 +90,7 @@ void AddNOp(T* out, T** in, size_t num_elems, size_t num_inputs)
 
 int ops_AddN(const void* args, size_t len)
 {
-  std::cerr << __FUNCTION__ << std::endl;
+  LOG(1) << __FUNCTION__;
 #define MAX_INPUTS 16
   struct Args {
     int output_type;
