@@ -12,6 +12,7 @@ add_library(vetfkernel SHARED
 	src/conv2d.cc
 	src/conv2d_backprop_filter.cc
 	src/conv2d_backprop_input.cc
+	src/maxpooling.cc
         src/ops.cc)
 
 target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH})
