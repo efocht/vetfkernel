@@ -24,7 +24,13 @@ class LogMessage : public std::basic_ostringstream<char> {
     }
 };
 
+#ifndef NDEBUG
 #define LOG(lvl) \
   if ((lvl) <= LogMessage::getMinLogLevel()) LogMessage()
+
+#else
+#define LOG(lvl) \
+  if (false) LogMessage()
+#endif
 
 #endif
