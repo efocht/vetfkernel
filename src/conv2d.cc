@@ -42,7 +42,7 @@ int conv2d(const void* arg, size_t len)
 {
 
 #ifdef _DEBUG
-    fprintf(stderr, "conv2d\n");
+    fprintf(stderr, "[start]conv2d\n");
 #endif
     assert(len == sizeof(ConvParam));
     const ConvParam& p = *(ConvParam*)arg;
@@ -132,5 +132,8 @@ int conv2d(const void* arg, size_t len)
 
     if( transformed_filter != NULL ) free(transformed_filter) ;
 
+#ifdef _DEBUG
+    fprintf(stderr, "[end]conv2d\n");
+#endif
     return 0;
 }

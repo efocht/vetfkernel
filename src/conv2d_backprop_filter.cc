@@ -42,7 +42,7 @@ int conv2d_backprop_filter(const void* arg, size_t len)
 {
 
 #ifdef _DEBUG
-    fprintf(stderr, "conv2d_backprop_filter\n");
+    fprintf(stderr, "[start]conv2d_backprop_filter\n");
 #endif
     assert(len == sizeof(ConvParam));
     const ConvParam& p = *(ConvParam*)arg;
@@ -136,6 +136,9 @@ int conv2d_backprop_filter(const void* arg, size_t len)
         }
       }
       free(transformed_bp_filter) ;
-   }
+    }
+#ifdef _DEBUG
+    fprintf(stderr, "[end]conv2d_backprop_filter\n");
+#endif
     return 0;
 }
