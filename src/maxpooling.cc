@@ -30,6 +30,8 @@ struct PoolingParam {
     int col_window;
     int row_stride;
     int col_stride;
+    int row_padding;
+    int col_padding;
 
     int data_format;
     int data_type;
