@@ -60,6 +60,7 @@ int maxpooling(const void* arg, size_t len)
 #endif
      
     {
+#define NCHW_IDX(n,c,h,w,cl,hl,wl) ((((n)*(cl)+(c))*(hl)+(h))*(wl)+(w))
       float *pIn  = (float*)p.in ;
       float *pOut = (float*)p.out ;
  
@@ -71,16 +72,19 @@ int maxpooling(const void* arg, size_t len)
               float max_val = -FLT_MAX ;
               for(int64_t ph=0; ph<p.col_window; ph++) {
                 for(int64_t pw=0; pw<p.row_window; pw++) {
-                  const float input = pIn[(h*p.col_stride+ph)*p.in_param.w + (w*p.row_stride+pw)] ; 
-                  if( input > max_val ) max_val = input ;
+                  const int64_t in_idx = NCHW_IDX(n,c,h*p.col_stride+ph,w*p.row_stride+pw,p.in_param.c,p.in_param.h,p.in_param.w) ;
+                  const float   in_val = pIn[in_idx] ; 
+                  if( in_val > max_val ) max_val = in_val ;
                 }
               }
-              pOut[h*p.out_param.w + w] = max_val ;
+              const int64_t out_idx = NCHW_IDX(n,c,h,w,p.out_param.c,p.out_param.h,p.out_param.w) ;
+              pOut[out_idx] = max_val ;
             }
           }
         }
       }
     }
+
 #ifdef _DEBUG
     fprintf(stderr, "[end]maxpooling\n");
 #endif
