@@ -5,7 +5,7 @@ set(CMAKE_CXX_COMPILER /opt/nec/ve/bin/nc++)
 
 #set(CMAKE_CXX_FLAGS "-D_DEBUG")
 
-set(VEDNN_PATH ${CMAKE_SOURCE_DIR}/vednn)
+set(VEDNN_PATH ${CMAKE_SOURCE_DIR}/vednn CACHE PATH "path to vednn")
 
 add_library(vetfkernel SHARED 
 	src/libvetfkernel.cc
