@@ -4,7 +4,6 @@
 #include <cassert>
 
 #include <stdlib.h>
-#include <float.h>
 
 #include <vednn.h>
 
@@ -56,35 +55,43 @@ int maxpooling(const void* arg, size_t len)
     fprintf(stderr, "maxpooling: outnput (N,C,H,W) = (%d,%d,%d,%d)\n",
             p.out_param.n, p.out_param.c, p.out_param.h, p.out_param.w ) ;
     
-    fprintf(stderr, "maxpooling: window=%dx%d stride=%dx%d\n",
-            p.col_window,  p.row_window,
-            p.col_stride,  p.row_stride);
+    fprintf(stderr, "maxpooling: window=%dx%d stride=%dx%d, padding=%dx%d\n",
+            p.col_window,   p.row_window,
+            p.col_stride,   p.row_stride,
+            p.col_padding,  p.row_padding );
 #endif
      
     {
-#define NCHW_IDX(n,c,h,w,cl,hl,wl) ((((n)*(cl)+(c))*(hl)+(h))*(wl)+(w))
-      float *pIn  = (float*)p.in ;
-      float *pOut = (float*)p.out ;
- 
-      // [todo] too slow
-      for(int64_t n=0; n<p.out_param.n; n++) {
-        for(int64_t c=0; c<p.out_param.c; c++) {
-          for(int64_t h=0; h<p.out_param.h; h++) {
-            for(int64_t w=0; w<p.out_param.w; w++) {
-              float max_val = -FLT_MAX ;
-              for(int64_t ph=0; ph<p.col_window; ph++) {
-                for(int64_t pw=0; pw<p.row_window; pw++) {
-                  const int64_t in_idx = NCHW_IDX(n,c,h*p.col_stride+ph,w*p.row_stride+pw,p.in_param.c,p.in_param.h,p.in_param.w) ;
-                  const float   in_val = pIn[in_idx] ; 
-                  if( in_val > max_val ) max_val = in_val ;
-                }
-              }
-              const int64_t out_idx = NCHW_IDX(n,c,h,w,p.out_param.c,p.out_param.h,p.out_param.w) ;
-              pOut[out_idx] = max_val ;
-            }
-          }
-        }
-      }
+      void *pIn     = (void *) p.in ;
+      void *pOut    = (void *) p.out ;
+    
+      vednnTensorParam_t ParamIn ;
+      vednnTensorParam_t ParamOut ;
+
+      vednnPoolingParam_t ParamPool ;
+
+      ParamIn.dtype   = DTYPE_FLOAT ;
+      ParamIn.batch   = p.in_param.n ;
+      ParamIn.channel = p.in_param.c ;
+      ParamIn.height  = p.in_param.h ;
+      ParamIn.width   = p.in_param.w ;
+
+      ParamOut.dtype   = DTYPE_FLOAT ;
+      ParamOut.batch   = p.out_param.n ;
+      ParamOut.channel = p.out_param.c ;
+      ParamOut.width   = p.out_param.w ;
+      ParamOut.height  = p.out_param.h ;
+
+      ParamPool.windowWidth  = p.col_window ; 
+      ParamPool.windowHeight = p.row_window ; 
+      ParamPool.strideWidth  = p.col_stride ; 
+      ParamPool.strideHeight = p.row_stride ; 
+      ParamPool.padWidth     = p.col_padding / 2 ; 
+      ParamPool.padHeight    = p.row_padding / 2 ; 
+
+      vednnMaxPoolingForward(&ParamIn,     pIn,
+                       	     &ParamOut,    pOut, 
+                     	     &ParamPool ) ;
     }
 
 #ifdef _DEBUG

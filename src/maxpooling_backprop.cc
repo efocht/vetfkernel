@@ -65,42 +65,49 @@ int maxpooling_backprop(const void* arg, size_t len)
     fprintf(stderr, "maxpooling_backprop: in_bp   (N,C,H,W) = (%d,%d,%d,%d)\n",
             p.in_bp_param.n, p.in_bp_param.c, p.in_bp_param.h, p.in_bp_param.w ) ;
 
-    fprintf(stderr, "maxpooling_backprop: window=%dx%d stride=%dx%d\n",
-            p.col_window,  p.row_window,
-            p.col_stride,  p.row_stride);
+    fprintf(stderr, "maxpooling: window=%dx%d stride=%dx%d, padding=%dx%d\n",
+            p.col_window,   p.row_window,
+            p.col_stride,   p.row_stride,
+            p.col_padding,  p.row_padding );
 #endif
     
     {
-#define NCHW_IDX(n,c,h,w,cl,hl,wl) ((((n)*(cl)+(c))*(hl)+(h))*(wl)+(w))
-      float *pIn      = (float*)p.in ;
-      float *pOut     = (float*)p.out ;
-      float *pGradOut = (float*)p.out_bp ;
-      float *pGradIn  = (float*)p.in_bp ;
+      void *pGradOut  = (void *) p.out_bp ;
+      void *pOut      = (void *) p.out ;
+      void *pIn       = (void *) p.in ;
+      void *pGradIn   = (void *) p.in_bp ;
+    
+      vednnTensorParam_t ParamGradOut ;
+      vednnTensorParam_t ParamOut ;
+      vednnTensorParam_t ParamIn ;
+      vednnTensorParam_t ParamGradIn ;
 
-      // [todo] too slow
-      for(int64_t n=0; n<p.out_param.n; n++) {
-        for(int64_t c=0; c<p.out_param.c; c++) {
-          for(int64_t h=0; h<p.out_param.h; h++) {
-            for(int64_t w=0; w<p.out_param.w; w++) {
-              const int64_t out_idx = NCHW_IDX(n,c,h,w,p.out_param.c,p.out_param.h,p.out_param.w) ;
-              const float   out_val = pOut[out_idx] ;
-              int found = 0;
-              for(int64_t ph=0; ph<p.col_window; ph++) {
-                for(int64_t pw=0; pw<p.row_window; pw++) {
-                  const int64_t in_idx = NCHW_IDX(n,c,h*p.col_stride+ph,w*p.row_stride+pw,p.in_param.c,p.in_param.h,p.in_param.w) ;
-                  if( !found && (out_val == pIn[in_idx])) {
-                    pGradIn[in_idx] = pGradOut[out_idx] ;
-                    found = 1 ;
-                  }
-                  else {
-                    pGradIn[in_idx] = 0.f ;
-                  }
-                }
-              }
-            }
-          }
-        }
-      } 
+      vednnPoolingParam_t ParamPool ;
+
+      ParamGradOut.dtype   = ParamOut.dtype   = DTYPE_FLOAT ;
+      ParamGradOut.batch   = ParamOut.batch   = p.out_param.n ;
+      ParamGradOut.channel = ParamOut.channel = p.out_param.c ;
+      ParamGradOut.width   = ParamOut.width   = p.out_param.w ;
+      ParamGradOut.height  = ParamOut.height  = p.out_param.h ;
+      
+      ParamGradIn.dtype   = ParamIn.dtype   = DTYPE_FLOAT ;
+      ParamGradIn.batch   = ParamIn.batch   = p.in_param.n ;
+      ParamGradIn.channel = ParamIn.channel = p.in_param.c ;
+      ParamGradIn.height  = ParamIn.height  = p.in_param.h ;
+      ParamGradIn.width   = ParamIn.width   = p.in_param.w ;
+
+      ParamPool.windowWidth  = p.col_window ; 
+      ParamPool.windowHeight = p.row_window ; 
+      ParamPool.strideWidth  = p.col_stride ; 
+      ParamPool.strideHeight = p.row_stride ; 
+      ParamPool.padWidth     = p.col_padding / 2 ; 
+      ParamPool.padHeight    = p.row_padding / 2 ; 
+
+      vednnMaxPoolingBackward(&ParamGradOut,   pGradOut, 
+                       	      &ParamOut,       pOut, 
+                              &ParamIn,        pIn,
+                       	      &ParamGradIn,    pGradIn, 
+                     	      &ParamPool ) ;
     }     
 
 #ifdef _DEBUG
