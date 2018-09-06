@@ -2,7 +2,7 @@
 
     % mkdir build
     % cd build
-    % cmake3 ..
+    % cmake3 -DVEDNN_PATH=../../vednn/src ..
     % make
 
 ## 実行
