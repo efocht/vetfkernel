@@ -75,6 +75,15 @@ void AddNOp(T* out, T** in, size_t num_elems, size_t num_inputs)
   }
 #endif
 
+#if 1
+  memset(out, 0, sizeof(T) * num_elems);
+  for (size_t j = 0; j < num_inputs; ++j) {
+    for (size_t i = 0; i < num_elems; ++i) {
+      out[i] += in[j][i];
+    }
+  }
+
+#else
   for (size_t i = 0; i < num_elems; ++i) {
     T s = 0;
     for (size_t j = 0; j < num_inputs; ++j) {
@@ -85,6 +94,7 @@ void AddNOp(T* out, T** in, size_t num_elems, size_t num_inputs)
     }
     out[i] = s;
   }
+#endif
 }
 };
 
@@ -105,7 +115,10 @@ int ops_AddN(const void* args, size_t len)
       return 1;
   }
 
+
   p = reinterpret_cast<const Args*>(args);
+
+  LOG(2) << __FUNCTION__ << "num_elems=" << p->num_elems << " num_inputs=" << p->num_inputs;
 
   if (p->output_type == DT_FLOAT) {
     AddNOp<float>((float*)p-> out, (float**)p->in, p->num_elems, p->num_inputs);
