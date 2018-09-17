@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <iostream>
+#include <algorithm>
 #include "kernel.h"
 #include "types.h"
 #include "log.h"
@@ -9,12 +10,16 @@ REGISTER_KERNEL("Fill", "op_fill");
 REGISTER_KERNEL("AddN", "op_AddN");
 REGISTER_KERNEL("BiasAdd", "op_BiasAdd");
 REGISTER_KERNEL("BiasAddGrad", "op_BiasAddGrad");
+REGISTER_KERNEL("Relu", "op_Relu");
+REGISTER_KERNEL("ReluGrad", "op_ReluGrad");
 
 extern "C" {
   int op_fill(const void* arg, size_t len);
   int op_AddN(const void* arg, size_t len);
   int op_BiasAdd(const void* arg, size_t len);
   int op_BiasAddGrad(const void* arg, size_t len);
+  int op_Relu(const void* arg, size_t len);
+  int op_ReluGrad(const void* arg, size_t len);
 }
 
 namespace {
@@ -288,7 +293,7 @@ int BiasAddGrad_NCHW(uint64_t output, uint64_t output_backprop, int batch, int w
 
 int op_BiasAddGrad(const void* args, size_t len)
 {
-  LOG(1) << __FUNCTION__;
+  LOG(2) << __FUNCTION__;
   struct Args{
     int dtype;
     int data_format;
@@ -314,8 +319,78 @@ int op_BiasAddGrad(const void* args, size_t len)
   } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
     return BiasAddGrad_NCHW<float>(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
   }
-#if 0
-  fprintf(stderr, "%s done\n", __PRETTY_FUNCTION__);
-#endif
+  LOG(2) << __FUNCTION__ << " done";
+  return 1;
+}
+
+//
+// Relu and ReluGrad
+//
+
+namespace {
+template<typename T>
+  int Relu(uint64_t in, uint64_t out, uint64_t num_elems)
+  {
+    const T* pi = reinterpret_cast<const T*>(in);
+    T* po = reinterpret_cast<T*>(out);
+
+    for (uint64_t i = 0; i < num_elems; ++i) {
+      po[i] = pi[i] > T(0.0) ? pi[i] : T(0.0);
+      //po[i] = std::max(T(0), pi[i]); // unvectorized. why?
+    }
+
+    return 0;
+  }
+
+template<typename T>
+  int ReluGrad(uint64_t g, uint64_t a, uint64_t out, uint64_t num_elems)
+  {
+    const T* pg = reinterpret_cast<const T*>(g);
+    const T* pa = reinterpret_cast<const T*>(a);
+    T* po = reinterpret_cast<T*>(out);
+
+    for (uint64_t i = 0; i < num_elems; ++i) {
+      po[i] = pg[i] * (pa[i] > 0);
+    }
+
+    return 0;
+  }
+}
+
+int op_Relu(const void* args, size_t len)
+{
+  struct Args {
+    int dtype;
+    uint64_t in;
+    uint64_t out;
+    uint64_t num_elems;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->dtype == DT_FLOAT) {
+    return Relu<float>(p->in, p->out, p->num_elems);
+  }
+  return 1;
+}
+
+int op_ReluGrad(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__;
+  struct Args {
+    int dtype;
+    uint64_t g;
+    uint64_t a;
+    uint64_t output;
+    uint64_t num_elems;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->dtype == DT_FLOAT) {
+    return ReluGrad<float>(p->g, p->a, p->output, p->num_elems);
+  }
   return 1;
 }

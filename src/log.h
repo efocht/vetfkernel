@@ -24,6 +24,13 @@ class LogMessage : public std::basic_ostringstream<char> {
     }
 };
 
+/*
+ * Log level
+ * 1: Initialization, once per execution
+ * 2: Kernel begin and end
+ * 3 or more: Details
+ */
+
 #ifndef NDEBUG
 #define LOG(lvl) \
   if ((lvl) <= LogMessage::getMinLogLevel()) LogMessage()
