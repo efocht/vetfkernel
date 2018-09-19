@@ -181,14 +181,11 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 
   for (int b = 0; b < batch; ++b) {
     for (int c = 0; c < channel; ++c) {
-      for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-          int i 
-            = b * height * width * channel
-            + c * height * width
-            + y * width;
-          pout[i + x] = pin[i + x] + pbias[c];
-        }
+      for (int xy = 0; xy < width*height; ++xy) {
+        int i 
+          = b * height * width * channel
+          + c * height * width ;
+        pout[i + xy] = pin[i + xy] + pbias[c];
       }
     }
   }
