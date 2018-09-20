@@ -1,17 +1,26 @@
 #include <cstdio>
 #include <cstdint>
-#include <iostream>
+#include <cstdint>
+#include <cassert>
 #include <algorithm>
 #include "kernel.h"
 #include "types.h"
 #include "log.h"
 
+REGISTER_KERNEL("Snapshot", "op_Snapshot")
 REGISTER_KERNEL("Fill", "op_fill");
 REGISTER_KERNEL("AddN", "op_AddN");
 REGISTER_KERNEL("BiasAdd", "op_BiasAdd");
 REGISTER_KERNEL("BiasAddGrad", "op_BiasAddGrad");
 REGISTER_KERNEL("Relu", "op_Relu");
 REGISTER_KERNEL("ReluGrad", "op_ReluGrad");
+REGISTER_KERNEL("Mul", "op_Mul");
+
+#define CHECK_ARG_LEN(l0, l1) \
+  if ((l0) != (l1)) { \
+      fprintf(stderr, "%s: illegal argument lenght: %ld expected but %ld\n", (l1), (l0)); \
+      return 1; \
+  }
 
 extern "C" {
   int op_fill(const void* arg, size_t len);
@@ -20,6 +29,8 @@ extern "C" {
   int op_BiasAddGrad(const void* arg, size_t len);
   int op_Relu(const void* arg, size_t len);
   int op_ReluGrad(const void* arg, size_t len);
+  int op_Mul(const void* arg, size_t len);
+  int op_Snapshot(const void* arg, size_t len);
 }
 
 namespace {
@@ -106,12 +117,6 @@ void AddNOp(T* out, T** in, size_t num_elems, size_t num_inputs)
 #endif
 }
 };
-
-#define CHECK_ARG_LEN(l0, l1) \
-  if ((l0) != (l1)) { \
-      fprintf(stderr, "%s: illegal argument lenght: %ld expected but %ld\n", (l1), (l0)); \
-      return 1; \
-  }
 
 int op_AddN(const void* args, size_t len)
 {
@@ -391,3 +396,109 @@ int op_ReluGrad(const void* args, size_t len)
   }
   return 1;
 }
+
+//
+// Mul
+// 
+
+namespace {
+template <typename T>
+mul_nx1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = pi0[i] * i1;
+  }
+}
+
+template <typename T>
+mul_nxn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = pi0[i] * pi1[i];
+  }
+}
+}
+
+int op_Mul(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__;
+  struct Args {
+    int dtype;
+    uint64_t in0;
+    uint64_t in1;
+    uint64_t out;
+    int32_t dims_in0;
+    int32_t dims_in1;
+    int32_t dims_out;
+    int64_t nelems_in0;
+    int64_t nelems_in1;
+    int64_t nelems_out;
+    int64_t dim_size_in0[8];
+    int64_t dim_size_in1[8];
+    int64_t dim_size_out[8];
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  LOG(3) << "op_Mul:"
+    << " dims_in0=" << p->dims_in0
+    << " dims_in1=" << p->dims_in1
+    << " dims_out=" << p->dims_out
+    << " nelems_in0=" << p->nelems_in0
+    << " nelems_in1=" << p->nelems_in1
+    << " nelems_out=" << p->nelems_out;
+
+  if (p->dtype == DT_FLOAT) {
+    if (p->nelems_in0 == 1) {
+      assert(p->nelems_in1 == p->nelems_out);
+      mul_nx1<float>(p->out, p->in1, p->in0, p->nelems_out);
+    } else if (p->nelems_in1 == 1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      mul_nx1<float>(p->out, p->in0, p->in1, p->nelems_out);
+    } else if (p->nelems_in0 == p->nelems_in1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      mul_nxn<float>(p->out, p->in0, p->in1, p->nelems_out);
+    } else {
+      return 1;
+    }
+  } else {
+    return 1;
+  }
+
+  LOG(2) << __FUNCTION__ << " end";
+
+  return 0;
+}
+
+int op_Snapshot(const void* arg, size_t len)
+{
+  LOG(2) << __FUNCTION__;
+  struct Arg {
+    uint64_t dst;
+    uint64_t src;
+    size_t size;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Arg));
+  p = reinterpret_cast<const Arg*>(arg);
+
+  LOG(3) << __FUNCTION__ 
+    << " dst=" << p->dst << " src=" << p->src << " size=" << p->size; 
+
+  memcpy(reinterpret_cast<void*>(p->dst),
+         reinterpret_cast<const void*>(p->src),
+         p->size);
+  LOG(2) << __FUNCTION__ << " done";
+
+  return 0;
+}
+
