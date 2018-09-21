@@ -7,6 +7,8 @@
 #include "types.h"
 #include "log.h"
 
+#include "vednn.h"
+
 REGISTER_KERNEL("Snapshot", "op_Snapshot")
 REGISTER_KERNEL("Fill", "op_fill");
 REGISTER_KERNEL("AddN", "op_AddN");
@@ -329,36 +331,6 @@ int op_BiasAddGrad(const void* args, size_t len)
 // Relu and ReluGrad
 //
 
-namespace {
-template<typename T>
-  int Relu(uint64_t in, uint64_t out, uint64_t num_elems)
-  {
-    const T* pi = reinterpret_cast<const T*>(in);
-    T* po = reinterpret_cast<T*>(out);
-
-    for (uint64_t i = 0; i < num_elems; ++i) {
-      po[i] = pi[i] > T(0.0) ? pi[i] : T(0.0);
-      //po[i] = std::max(T(0), pi[i]); // unvectorized. why?
-    }
-
-    return 0;
-  }
-
-template<typename T>
-  int ReluGrad(uint64_t g, uint64_t a, uint64_t out, uint64_t num_elems)
-  {
-    const T* pg = reinterpret_cast<const T*>(g);
-    const T* pa = reinterpret_cast<const T*>(a);
-    T* po = reinterpret_cast<T*>(out);
-
-    for (uint64_t i = 0; i < num_elems; ++i) {
-      po[i] = pg[i] * (pa[i] > 0);
-    }
-
-    return 0;
-  }
-}
-
 int op_Relu(const void* args, size_t len)
 {
   struct Args {
@@ -372,7 +344,11 @@ int op_Relu(const void* args, size_t len)
   p = reinterpret_cast<const Args*>(args);
 
   if (p->dtype == DT_FLOAT) {
-    return Relu<float>(p->in, p->out, p->num_elems);
+    return vednnActivationForward(
+      VEDNN_ACTIVATION_RELU,
+      (void*)(p->in), (void*)(p->out),
+      p->num_elems 
+    ) ;
   }
   return 1;
 }
@@ -392,7 +368,12 @@ int op_ReluGrad(const void* args, size_t len)
   p = reinterpret_cast<const Args*>(args);
 
   if (p->dtype == DT_FLOAT) {
-    return ReluGrad<float>(p->g, p->a, p->output, p->num_elems);
+    return vednnActivationBackward(
+      VEDNN_ACTIVATION_RELU,
+      (void*)(p->g), (void*)(p->a), (void*)(p->output),
+      p->num_elems 
+    ) ;
+
   }
   return 1;
 }
