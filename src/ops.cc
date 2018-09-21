@@ -22,6 +22,7 @@ REGISTER_KERNEL("Sum", "op_Sum");
 REGISTER_KERNEL("Add", "op_Add");
 REGISTER_KERNEL("Neg", "op_Neg");
 REGISTER_KERNEL("Floor", "op_Floor");
+REGISTER_KERNEL("Transpose", "op_Transpose");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -43,6 +44,7 @@ extern "C" {
   int op_Add(const void* arg, size_t len);
   int op_Neg(const void* arg, size_t len);
   int op_Floor(const void* arg, size_t len);
+  int op_Transpose(const void* arg, size_t len);
 }
 
 namespace {
@@ -813,5 +815,107 @@ int op_Floor(const void* args, size_t len)
 
   LOG(2) << __FUNCTION__ << " end";
   return 0;
+}
+
+//
+// Transpose
+//
+
+namespace {
+template<typename Tin, typename Tout = Tin>
+  int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size)
+  {
+    Tout* po = reinterpret_cast<Tout*>(out);
+    const Tin* pi = reinterpret_cast<Tin*>(in);
+
+    uint64_t si2 = dim_size[3];
+    uint64_t si1 = si2 * dim_size[2];
+    uint64_t si0 = si1 * dim_size[1];
+
+    uint64_t so2 = dim_size[1];
+    uint64_t so1 = so2 * dim_size[3];
+    uint64_t so0 = so1 * dim_size[2];
+
+    for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
+      for (int64_t i1 = 0; i1 < dim_size[2]; ++i1) {
+        for (int64_t i2 = 0; i2 < dim_size[3]; ++i2) {
+          for (int64_t i3 = 0; i3 < dim_size[1]; ++i3) {
+            po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
+              = pi[i0 * si0 + i1 * si2 + i2 + i3 * si1];
+          }
+        }
+      }
+    }
+
+    return 0;
+  }
+
+template<typename Tin, typename Tout = Tin>
+  int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size)
+  {
+    Tout* po = reinterpret_cast<Tout*>(out);
+    const Tin* pi = reinterpret_cast<Tin*>(in);
+
+    uint64_t si2 = dim_size[3];
+    uint64_t si1 = si2 * dim_size[2];
+    uint64_t si0 = si1 * dim_size[1];
+
+    uint64_t so2 = dim_size[2];
+    uint64_t so1 = so2 * dim_size[1];
+    uint64_t so0 = so1 * dim_size[3];
+
+    for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
+      for (int64_t i1 = 0; i1 < dim_size[3]; ++i1) {
+        for (int64_t i2 = 0; i2 < dim_size[1]; ++i2) {
+          for (int64_t i3 = 0; i3 < dim_size[2]; ++i3) {
+            po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
+              = pi[i0 * si0 + i1 + i2 * si1 + i3 * si2];
+          }
+        }
+      }
+    }
+
+    return 0;
+  }
+}
+
+int op_Transpose(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct Args {
+    int dtype;
+    uint64_t in;
+    uint64_t out;
+    int size;
+    int32_t dim_size[4]; // in
+    int32_t perm[4];
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  LOG(3) << __FUNCTION__ << " size=" << p->size
+    << " perm=(" << p->perm[0]
+    << " " << p->perm[1]
+    << " " << p->perm[2]
+    << " " << p->perm[3]
+    << ")";
+
+  int ret = 1;
+  if (p->dtype == DT_FLOAT) {
+    if (p->size == 4) {
+      if (p->perm[0] == 0 && p->perm[1] == 2 
+          && p->perm[2] == 3 && p->perm[3] == 1) {
+        ret = transpose4_0231<float>(p->out, p->in, p->dim_size);
+      } else if (p->perm[0] == 0 && p->perm[1] == 3 
+               && p->perm[2] == 1 && p->perm[3] == 2) {
+        ret = transpose4_0312<float>(p->out, p->in, p->dim_size);
+      }
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret;
 }
 
