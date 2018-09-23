@@ -31,14 +31,6 @@ REGISTER_KERNEL("Rsqrt", "op_Rsqrt");
 REGISTER_KERNEL("Square", "op_Square");
 REGISTER_KERNEL("Floor", "op_Floor");
 
-// Binary
-REGISTER_KERNEL("Add", "op_Add");
-REGISTER_KERNEL("Sub", "op_Sub");
-REGISTER_KERNEL("Mul", "op_Mul");
-REGISTER_KERNEL("Div", "op_Div");
-REGISTER_KERNEL("Minimum", "op_Minimum");
-REGISTER_KERNEL("Maximum", "op_Maximum");
-
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
       fprintf(stderr, "%s: illegal argument lenght: %ld expected but %ld\n", (l1), (l0)); \
@@ -52,18 +44,12 @@ extern "C" {
   int op_BiasAddGrad(const void* arg, size_t len);
   int op_Relu(const void* arg, size_t len);
   int op_ReluGrad(const void* arg, size_t len);
-  int op_Mul(const void* arg, size_t len);
   int op_Snapshot(const void* arg, size_t len);
-  int op_Div(const void* arg, size_t len);
   int op_Sum(const void* arg, size_t len);
-  int op_Add(const void* arg, size_t len);
-  int op_Sub(const void* arg, size_t len);
   int op_Neg(const void* arg, size_t len);
   int op_Floor(const void* arg, size_t len);
   int op_Transpose(const void* arg, size_t len);
   int op_MatMul(const void* arg, size_t len);
-  int op_Minimum(const void* arg, size_t len);
-  int op_Maximum(const void* arg, size_t len);
   int op_Sqrt(const void* arg, size_t len);
   int op_Rsqrt(const void* arg, size_t len);
   int op_Square(const void* arg, size_t len);
@@ -412,87 +398,6 @@ int op_ReluGrad(const void* args, size_t len)
   return 1;
 }
 
-//
-// Mul
-// 
-
-namespace {
-template <typename T>
-int mul_nx1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  T i1 = *reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n; ++i) {
-    po[i] = pi0[i] * i1;
-  }
-
-  return 0;
-}
-
-template <typename T>
-int mul_nxn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  const T* pi1 = reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n; ++i) {
-    po[i] = pi0[i] * pi1[i];
-  }
-
-  return 0;
-}
-}
-
-int op_Mul(const void* args, size_t len)
-{
-  LOG(2) << __FUNCTION__;
-  struct Args {
-    int dtype;
-    uint64_t in0;
-    uint64_t in1;
-    uint64_t out;
-    int32_t dims_in0;
-    int32_t dims_in1;
-    int32_t dims_out;
-    int64_t nelems_in0;
-    int64_t nelems_in1;
-    int64_t nelems_out;
-    int64_t dim_size_in0[8];
-    int64_t dim_size_in1[8];
-    int64_t dim_size_out[8];
-  } const* p;
-
-  CHECK_ARG_LEN(len, sizeof(Args));
-  p = reinterpret_cast<const Args*>(args);
-
-  LOG(3) << "op_Mul:"
-    << " dims_in0=" << p->dims_in0
-    << " dims_in1=" << p->dims_in1
-    << " dims_out=" << p->dims_out
-    << " nelems_in0=" << p->nelems_in0
-    << " nelems_in1=" << p->nelems_in1
-    << " nelems_out=" << p->nelems_out;
-
-  int ret = 1;
-  if (p->dtype == DT_FLOAT) {
-    if (p->nelems_in0 == 1) {
-      assert(p->nelems_in1 == p->nelems_out);
-      ret = mul_nx1<float>(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in1 == 1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = mul_nx1<float>(p->out, p->in0, p->in1, p->nelems_out);
-    } else if (p->nelems_in0 == p->nelems_in1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = mul_nxn<float>(p->out, p->in0, p->in1, p->nelems_out);
-    }
-  }
-
-  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
-  return ret;
-}
 
 int op_Snapshot(const void* arg, size_t len)
 {
@@ -515,98 +420,6 @@ int op_Snapshot(const void* arg, size_t len)
   LOG(2) << __FUNCTION__ << ": done";
 
   return 0;
-}
-
-//
-// Div
-// 
-
-namespace {
-template <typename T>
-void div_nx1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  T i1 = *reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < nelems; ++i) {
-    po[i] = pi0[i] / i1;
-  }
-}
-
-// nelems_in0 > nelems_in1
-template <typename T>
-void div2_nn_n1(uint64_t out, 
-                uint64_t in0,
-                uint64_t in1, 
-                size_t n0,
-                size_t n1)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  const T* pi1 = reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n0; ++i) {
-    for (size_t j = 0; j < n1; ++j) {
-      po[i * n1 + j] = pi0[i * n1 + j] / pi1[i];
-    }
-  }
-
-}
-} // namespace
-
-int op_Div(const void* args, size_t len)
-{
-  LOG(2) << __FUNCTION__ << ": begin";
-  struct Args {
-    int dtype;
-    uint64_t in0;
-    uint64_t in1;
-    uint64_t out;
-    int32_t dims_in0;
-    int32_t dims_in1;
-    int32_t dims_out;
-    int64_t nelems_in0;
-    int64_t nelems_in1;
-    int64_t nelems_out;
-    int64_t dim_size_in0[8];
-    int64_t dim_size_in1[8];
-    int64_t dim_size_out[8];
-  } const* p;
-
-  CHECK_ARG_LEN(len, sizeof(Args));
-  p = reinterpret_cast<const Args*>(args);
-
-  LOG(3) << "op_Div:"
-    << " dims_in0=" << p->dims_in0
-    << " dims_in1=" << p->dims_in1
-    << " dims_out=" << p->dims_out
-    << " nelems_in0=" << p->nelems_in0
-    << " nelems_in1=" << p->nelems_in1
-    << " nelems_out=" << p->nelems_out;
-
-  int ret = 0;
-  if (p->dtype == DT_FLOAT) {
-    if (p->nelems_in0 == 1) {
-      assert(p->nelems_in1 == p->nelems_out);
-      div_nx1<float>(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in1 == 1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      div_nx1<float>(p->out, p->in0, p->in1, p->nelems_out);
-    } else if (p->dims_in0 == 2 && p->dims_in1 == 2) {
-      if (p->dim_size_in0[0] == p->dim_size_in1[0]
-          && p->dim_size_in1[1] == 1) {
-        div2_nn_n1<float>(p->out, p->in0, p->in1, p->dim_size_in0[0], p->dim_size_in0[1]);
-      }
-    } else {
-      ret = 1;
-    }
-
-  }
-
-  LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
-
-  return ret;
 }
 
 //
@@ -707,170 +520,6 @@ int op_Sum(const void* args, size_t len)
   return ret;
 }
 
-//
-// Add
-//
-
-namespace {
-template <typename T>
-int add_n_1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  T i1 = *reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n; ++i) {
-    po[i] = pi0[i] + i1;
-  }
-
-  return 0;
-}
-
-template <typename T>
-int add_n_n(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  const T* pi1 = reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n; ++i) {
-    po[i] = pi0[i] + pi1[i];
-  }
-
-  return 0;
-}
-} // namespace
-
-int op_Add(const void* args, size_t len)
-{
-  LOG(2) << __FUNCTION__ << ": begin";
-  struct Args {
-    int dtype;
-    uint64_t in0;
-    uint64_t in1;
-    uint64_t out;
-    int32_t dims_in0;
-    int32_t dims_in1;
-    int32_t dims_out;
-    int64_t nelems_in0;
-    int64_t nelems_in1;
-    int64_t nelems_out;
-    int64_t dim_size_in0[8];
-    int64_t dim_size_in1[8];
-    int64_t dim_size_out[8];
-  } const* p;
-
-  CHECK_ARG_LEN(len, sizeof(Args));
-  p = reinterpret_cast<const Args*>(args);
-
-  LOG(3) << "op_Add:"
-    << " dims_in0=" << p->dims_in0
-    << " dims_in1=" << p->dims_in1
-    << " dims_out=" << p->dims_out
-    << " nelems_in0=" << p->nelems_in0
-    << " nelems_in1=" << p->nelems_in1
-    << " nelems_out=" << p->nelems_out;
-
-  int ret = 1;
-
-  if (p->dtype == DT_FLOAT) {
-    if (p->nelems_in0 == 1) {
-      assert(p->nelems_in1 == p->nelems_out);
-      ret = add_n_1<float>(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in1 == 1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = add_n_1<float>(p->out, p->in0, p->in1, p->nelems_out);
-    } else if (p->nelems_in0 == p->nelems_in1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = add_n_n<float>(p->out, p->in0, p->in1, p->nelems_out);
-    }
-  }
-
-  LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
-
-  return ret;
-}
-
-//
-// Sub
-// 
-
-namespace {
-int op_Binary(const void* args, size_t len,
-              int (*n1_f32)(uint64_t, uint64_t, uint64_t, size_t),
-              int (*nn_f32)(uint64_t, uint64_t, uint64_t, size_t),
-              const char* name = NULL)
-{
-  LOG(2) << __FUNCTION__ << "(" << name << ") begin";
-  struct Args {
-    int dtype;
-    uint64_t in0;
-    uint64_t in1;
-    uint64_t out;
-    int32_t dims_in0;
-    int32_t dims_in1;
-    int32_t dims_out;
-    int64_t nelems_in0;
-    int64_t nelems_in1;
-    int64_t nelems_out;
-    int64_t dim_size_in0[8];
-    int64_t dim_size_in1[8];
-    int64_t dim_size_out[8];
-  } const* p;
-
-  CHECK_ARG_LEN(len, sizeof(Args));
-  p = reinterpret_cast<const Args*>(args);
-
-  LOG(2) << __FUNCTION__ << "(" << name << ")"
-    << " dims_in0=" << p->dims_in0
-    << " dims_in1=" << p->dims_in1
-    << " dims_out=" << p->dims_out
-    << " nelems_in0=" << p->nelems_in0
-    << " nelems_in1=" << p->nelems_in1
-    << " nelems_out=" << p->nelems_out;
-
-  int ret = 1;
-  if (p->dtype == DT_FLOAT) {
-    if (p->nelems_in0 == 1) {
-      assert(p->nelems_in1 == p->nelems_out);
-      if (n1_f32)
-        ret = n1_f32(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in1 == 1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      if (n1_f32)
-        ret = n1_f32(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in0 == p->nelems_in1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      if (nn_f32)
-        ret = nn_f32(p->out, p->in0, p->in1, p->nelems_out);
-    }
-  }
-
-  LOG(2) << __FUNCTION__ << "(" << name << ") end. ret=" << ret;
-  return ret;
-}
-
-
-template <typename T>
-int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  const T* pi1 = reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < nelems; ++i) {
-    po[i] = pi0[i] - pi1[i];
-  }
-  return 0;
-}
-} // namespace
-
-int op_Sub(const void* args, size_t len)
-{
-  return op_Binary(args, len, 
-                   NULL, sub_nn<float>,
-                   "op_Sub");
-}
 
 //
 // Floor
@@ -1012,7 +661,7 @@ int op_Transpose(const void* args, size_t len)
           && p->perm[2] == 3 && p->perm[3] == 1) {
         ret = transpose4_0231<float>(p->out, p->in, p->dim_size);
       } else if (p->perm[0] == 0 && p->perm[1] == 3 
-               && p->perm[2] == 1 && p->perm[3] == 2) {
+                 && p->perm[2] == 1 && p->perm[3] == 2) {
         ret = transpose4_0312<float>(p->out, p->in, p->dim_size);
       }
     }
@@ -1052,26 +701,26 @@ template<> void blas_gemm<float>(GEMM_ARGS(float)) { sgemm_(GEMM_REAL_ARGS); }
 //   = B[K x N] (RxC in RM) * A[M x K] (RxC in RM)
 //                
 template<typename T, char TransA, char TransB>
-int matmul(uint64_t c, uint64_t a, uint64_t b, int M, int N, int K)
-{
-  LOG(2) << __FUNCTION__ << " begin: (" << M << "," << N << "," << K << ")";
-  T* C = reinterpret_cast<T*>(c);
-  const T* A = reinterpret_cast<const T*>(a);
-  const T* B = reinterpret_cast<const T*>(b);
+  int matmul(uint64_t c, uint64_t a, uint64_t b, int M, int N, int K)
+  {
+    LOG(2) << __FUNCTION__ << " begin: (" << M << "," << N << "," << K << ")";
+    T* C = reinterpret_cast<T*>(c);
+    const T* A = reinterpret_cast<const T*>(a);
+    const T* B = reinterpret_cast<const T*>(b);
 
-  T alpha = T(1);
-  T beta = T(0);
+    T alpha = T(1);
+    T beta = T(0);
 
-  char transa = TransA;
-  char transb = TransB;
-  int lda = TransA == 'N' ? K : M;
-  int ldb = TransB == 'N' ? N : K;
+    char transa = TransA;
+    char transb = TransB;
+    int lda = TransA == 'N' ? K : M;
+    int ldb = TransB == 'N' ? N : K;
 
-  //blas_gemm<T>(&transa, &transb, &N, &M, &K, &alpha, B, &N, A, &K, &beta, C, &N);
-  blas_gemm<T>(&transb, &transa, &N, &M, &K, &alpha, B, &ldb, A, &lda, &beta, C, &N);
-  LOG(2) << __FUNCTION__ << " end";
-  return 0;
-}
+    //blas_gemm<T>(&transa, &transb, &N, &M, &K, &alpha, B, &N, A, &K, &beta, C, &N);
+    blas_gemm<T>(&transb, &transa, &N, &M, &K, &alpha, B, &ldb, A, &lda, &beta, C, &N);
+    LOG(2) << __FUNCTION__ << " end";
+    return 0;
+  }
 }
 
 int op_MatMul(const void* args, size_t len)
@@ -1116,148 +765,6 @@ int op_MatMul(const void* args, size_t len)
   }
 
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
-  return ret;
-}
-
-//
-// Minimum
-//
-
-namespace {
-template <typename T>
-int minimum_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  T i1 = *reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n; ++i) {
-    po[i] = pi0[i] < i1 ? pi0[i] : i1;
-  }
-  return 0;
-}
-}
-
-int op_Minimum(const void* args, size_t len)
-{
-  LOG(2) << __FUNCTION__ << ": begin";
-  struct Args {
-    int dtype;
-    uint64_t in0;
-    uint64_t in1;
-    uint64_t out;
-    int32_t dims_in0;
-    int32_t dims_in1;
-    int32_t dims_out;
-    int64_t nelems_in0;
-    int64_t nelems_in1;
-    int64_t nelems_out;
-    int64_t dim_size_in0[8];
-    int64_t dim_size_in1[8];
-    int64_t dim_size_out[8];
-  } const* p;
-
-  CHECK_ARG_LEN(len, sizeof(Args));
-  p = reinterpret_cast<const Args*>(args);
-
-  LOG(3) << __FUNCTION__ << ":"
-    << " dims_in0=" << p->dims_in0
-    << " dims_in1=" << p->dims_in1
-    << " dims_out=" << p->dims_out
-    << " nelems_in0=" << p->nelems_in0
-    << " nelems_in1=" << p->nelems_in1
-    << " nelems_out=" << p->nelems_out;
-
-  int ret = 0;
-
-  if (p->dtype == DT_FLOAT) {
-    if (p->nelems_in0 == 1) {
-      assert(p->nelems_in1 == p->nelems_out);
-      ret = minimum_n1<float>(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in1 == 1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = minimum_n1<float>(p->out, p->in0, p->in1, p->nelems_out);
-#if 0
-    } else if (p->nelems_in0 == p->nelems_in1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = add_n_n<float>(p->out, p->in0, p->in1, p->nelems_out);
-#endif
-    }
-  }
-
-  LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
-
-  return ret;
-}
-
-//
-// Minimum
-//
-
-namespace {
-template <typename T>
-int maximum_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
-{
-  T* po = reinterpret_cast<T*>(out);
-  const T* pi0 = reinterpret_cast<const T*>(in0);
-  T i1 = *reinterpret_cast<const T*>(in1);
-
-  for (size_t i = 0; i < n; ++i) {
-    po[i] = pi0[i] > i1 ? pi0[i] : i1;
-  }
-  return 0;
-}
-}
-
-int op_Maximum(const void* args, size_t len)
-{
-  LOG(2) << __FUNCTION__ << ": begin";
-  struct Args {
-    int dtype;
-    uint64_t in0;
-    uint64_t in1;
-    uint64_t out;
-    int32_t dims_in0;
-    int32_t dims_in1;
-    int32_t dims_out;
-    int64_t nelems_in0;
-    int64_t nelems_in1;
-    int64_t nelems_out;
-    int64_t dim_size_in0[8];
-    int64_t dim_size_in1[8];
-    int64_t dim_size_out[8];
-  } const* p;
-
-  CHECK_ARG_LEN(len, sizeof(Args));
-  p = reinterpret_cast<const Args*>(args);
-
-  LOG(3) << __FUNCTION__ << ":"
-    << " dims_in0=" << p->dims_in0
-    << " dims_in1=" << p->dims_in1
-    << " dims_out=" << p->dims_out
-    << " nelems_in0=" << p->nelems_in0
-    << " nelems_in1=" << p->nelems_in1
-    << " nelems_out=" << p->nelems_out;
-
-  int ret = 0;
-
-  if (p->dtype == DT_FLOAT) {
-    if (p->nelems_in0 == 1) {
-      assert(p->nelems_in1 == p->nelems_out);
-      ret = maximum_n1<float>(p->out, p->in1, p->in0, p->nelems_out);
-    } else if (p->nelems_in1 == 1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = maximum_n1<float>(p->out, p->in0, p->in1, p->nelems_out);
-#if 0
-    } else if (p->nelems_in0 == p->nelems_in1) {
-      assert(p->nelems_in0 == p->nelems_out);
-      ret = add_n_n<float>(p->out, p->in0, p->in1, p->nelems_out);
-#endif
-    }
-  }
-
-  LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
-
   return ret;
 }
 

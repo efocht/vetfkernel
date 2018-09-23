@@ -14,7 +14,9 @@ add_library(vetfkernel STATIC
 	src/conv2d_backprop_input.cc
 	src/maxpooling.cc
 	src/maxpooling_backprop.cc
-        src/ops.cc)
+        src/ops.cc
+        src/ve_ops.cc
+        src/binary_ops.cc)
 
 target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH})
 target_include_directories(vetfkernel PRIVATE /opt/nec/ve/nlc/1.0.0/include)
