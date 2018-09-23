@@ -19,20 +19,25 @@ REGISTER_KERNEL("BiasAdd", "op_BiasAdd");
 REGISTER_KERNEL("BiasAddGrad", "op_BiasAddGrad");
 REGISTER_KERNEL("Relu", "op_Relu");
 REGISTER_KERNEL("ReluGrad", "op_ReluGrad");
-REGISTER_KERNEL("Mul", "op_Mul");
 REGISTER_KERNEL("Snapshot", "op_Snapshot")
-REGISTER_KERNEL("Div", "op_Div");
 REGISTER_KERNEL("Sum", "op_Sum");
-REGISTER_KERNEL("Add", "op_Add");
-REGISTER_KERNEL("Neg", "op_Neg");
-REGISTER_KERNEL("Floor", "op_Floor");
 REGISTER_KERNEL("Transpose", "op_Transpose");
 REGISTER_KERNEL("MatMul", "op_MatMul");
-REGISTER_KERNEL("Minimum", "op_Minimum");
-REGISTER_KERNEL("Maximum", "op_Maximum");
+
+// Unary
+REGISTER_KERNEL("Neg", "op_Neg");
 REGISTER_KERNEL("Sqrt", "op_Sqrt");
 REGISTER_KERNEL("Rsqrt", "op_Rsqrt");
 REGISTER_KERNEL("Square", "op_Square");
+REGISTER_KERNEL("Floor", "op_Floor");
+
+// Binary
+REGISTER_KERNEL("Add", "op_Add");
+REGISTER_KERNEL("Sub", "op_Sub");
+REGISTER_KERNEL("Mul", "op_Mul");
+REGISTER_KERNEL("Div", "op_Div");
+REGISTER_KERNEL("Minimum", "op_Minimum");
+REGISTER_KERNEL("Maximum", "op_Maximum");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -52,6 +57,7 @@ extern "C" {
   int op_Div(const void* arg, size_t len);
   int op_Sum(const void* arg, size_t len);
   int op_Add(const void* arg, size_t len);
+  int op_Sub(const void* arg, size_t len);
   int op_Neg(const void* arg, size_t len);
   int op_Floor(const void* arg, size_t len);
   int op_Transpose(const void* arg, size_t len);
@@ -783,6 +789,87 @@ int op_Add(const void* args, size_t len)
   LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
 
   return ret;
+}
+
+//
+// Sub
+// 
+
+namespace {
+int op_Binary(const void* args, size_t len,
+              int (*n1_f32)(uint64_t, uint64_t, uint64_t, size_t),
+              int (*nn_f32)(uint64_t, uint64_t, uint64_t, size_t),
+              const char* name = NULL)
+{
+  LOG(2) << __FUNCTION__ << "(" << name << ") begin";
+  struct Args {
+    int dtype;
+    uint64_t in0;
+    uint64_t in1;
+    uint64_t out;
+    int32_t dims_in0;
+    int32_t dims_in1;
+    int32_t dims_out;
+    int64_t nelems_in0;
+    int64_t nelems_in1;
+    int64_t nelems_out;
+    int64_t dim_size_in0[8];
+    int64_t dim_size_in1[8];
+    int64_t dim_size_out[8];
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  LOG(2) << __FUNCTION__ << "(" << name << ")"
+    << " dims_in0=" << p->dims_in0
+    << " dims_in1=" << p->dims_in1
+    << " dims_out=" << p->dims_out
+    << " nelems_in0=" << p->nelems_in0
+    << " nelems_in1=" << p->nelems_in1
+    << " nelems_out=" << p->nelems_out;
+
+  int ret = 1;
+  if (p->dtype == DT_FLOAT) {
+    if (p->nelems_in0 == 1) {
+      assert(p->nelems_in1 == p->nelems_out);
+      if (n1_f32)
+        ret = n1_f32(p->out, p->in1, p->in0, p->nelems_out);
+    } else if (p->nelems_in1 == 1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      if (n1_f32)
+        ret = n1_f32(p->out, p->in1, p->in0, p->nelems_out);
+    } else if (p->nelems_in0 == p->nelems_in1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      if (nn_f32)
+        ret = nn_f32(p->out, p->in0, p->in1, p->nelems_out);
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << "(" << name << ") end. ret=" << ret;
+  return ret;
+}
+
+
+template <typename T>
+int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < nelems; ++i) {
+    po[i] = pi0[i] - pi1[i];
+  }
+  return 0;
+}
+} // namespace
+
+int op_Sub(const void* args, size_t len)
+{
+  return op_Binary(args, len, 
+                   NULL, sub_nn<float>,
+                   "op_Sub");
 }
 
 //
