@@ -9,6 +9,10 @@
 
 #include "vednn.h"
 
+#define ADD_
+#include <cblas_f77.h>
+#undef ADD_
+
 REGISTER_KERNEL("Fill", "op_fill");
 REGISTER_KERNEL("AddN", "op_AddN");
 REGISTER_KERNEL("BiasAdd", "op_BiasAdd");
@@ -23,6 +27,7 @@ REGISTER_KERNEL("Add", "op_Add");
 REGISTER_KERNEL("Neg", "op_Neg");
 REGISTER_KERNEL("Floor", "op_Floor");
 REGISTER_KERNEL("Transpose", "op_Transpose");
+REGISTER_KERNEL("MatMul", "op_MatMul");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -45,6 +50,7 @@ extern "C" {
   int op_Neg(const void* arg, size_t len);
   int op_Floor(const void* arg, size_t len);
   int op_Transpose(const void* arg, size_t len);
+  int op_MatMul(const void* arg, size_t len);
 }
 
 namespace {
@@ -912,6 +918,103 @@ int op_Transpose(const void* args, size_t len)
                && p->perm[2] == 1 && p->perm[3] == 2) {
         ret = transpose4_0312<float>(p->out, p->in, p->dim_size);
       }
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret;
+}
+
+//
+// MatMul
+//
+
+namespace {
+#define GEMM_ARGS(T) \
+char* transa, char* transb, \
+const int* N, const int* M, const int* K, \
+const T* alpha, \
+const T* A, const int* lda, \
+const T* B, const int* ldb, \
+const T* beta, \
+T* C, const int* ldc
+
+#define GEMM_REAL_ARGS \
+transa, transb, N, M, K, alpha, A, lda, B, ldb, beta, C, ldc
+
+template <typename T> void blas_gemm(GEMM_ARGS(T)) { assert(false && "blas_gemm: not implemented"); }
+template<> void blas_gemm<float>(GEMM_ARGS(float)) { sgemm_(GEMM_REAL_ARGS); }
+
+// C[M x N] = A[M x K] * B[K x N] ([rows x cols] in row-major)
+//
+// M[H x W] (rows x cols in row-major) = M[W x H] (rows x cols in col-major)
+//
+// C[M x N] (RxC in RM)
+//   = C[N x M] (RxC in CM)
+//   = B[N x K] (RxC in CM) * A[K x M] (RxC in CM)
+//   = B[K x N] (RxC in RM) * A[M x K] (RxC in RM)
+//                
+template<typename T, char TransA, char TransB>
+int matmul(uint64_t c, uint64_t a, uint64_t b, int M, int N, int K)
+{
+  LOG(2) << __FUNCTION__ << " begin: (" << M << "," << N << "," << K << ")";
+  T* C = reinterpret_cast<T*>(c);
+  const T* A = reinterpret_cast<const T*>(a);
+  const T* B = reinterpret_cast<const T*>(b);
+
+  T alpha = T(1);
+  T beta = T(0);
+
+  char transa = TransA;
+  char transb = TransB;
+  int lda = TransA == 'N' ? K : M;
+  int ldb = TransB == 'N' ? N : K;
+
+  //blas_gemm<T>(&transa, &transb, &N, &M, &K, &alpha, B, &N, A, &K, &beta, C, &N);
+  blas_gemm<T>(&transb, &transa, &N, &M, &K, &alpha, B, &ldb, A, &lda, &beta, C, &N);
+  LOG(2) << __FUNCTION__ << " end";
+  return 0;
+}
+}
+
+int op_MatMul(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct Args {
+    int dtype;
+    uint64_t a;
+    uint64_t b;
+    uint64_t out;
+    int64_t dim_size_a[2];
+    int64_t dim_size_b[2];
+    int32_t transpose_a;
+    int32_t transpose_b;
+  } const *p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  LOG(3) << __FUNCTION__
+    << " a=(" << p->dim_size_a[0] << ", " << p->dim_size_a[1] << ")"
+    << " b=(" << p->dim_size_b[0] << ", " << p->dim_size_b[1] << ")"
+    << " transpose_a=" << p->transpose_a
+    << " transpose_b=" << p->transpose_b;
+
+  int ret = 0;
+  if (p->dtype == DT_FLOAT) {
+    if (!p->transpose_a && !p->transpose_b) {
+      assert(p->dim_size_a[1] == p->dim_size_b[0]);
+      ret = matmul<float, 'N', 'N'>(
+          p->out, p->a, p->b, p->dim_size_a[0], p->dim_size_b[1], p->dim_size_a[1]);
+    } else if (!p->transpose_a && p->transpose_b) {
+      assert(p->dim_size_a[1] == p->dim_size_b[1]);
+      ret = matmul<float, 'N', 'T'>(
+          p->out, p->a, p->b, p->dim_size_a[0], p->dim_size_b[0], p->dim_size_a[1]);
+    } else if (p->transpose_a && !p->transpose_b) {
+      assert(p->dim_size_a[0] == p->dim_size_b[0]);
+      ret = matmul<float, 'T', 'N'>(
+          p->out, p->a, p->b, p->dim_size_a[1], p->dim_size_b[1], p->dim_size_a[0]);
     }
   }
 
