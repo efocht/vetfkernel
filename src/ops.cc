@@ -28,6 +28,11 @@ REGISTER_KERNEL("Neg", "op_Neg");
 REGISTER_KERNEL("Floor", "op_Floor");
 REGISTER_KERNEL("Transpose", "op_Transpose");
 REGISTER_KERNEL("MatMul", "op_MatMul");
+REGISTER_KERNEL("Minimum", "op_Minimum");
+REGISTER_KERNEL("Maximum", "op_Maximum");
+REGISTER_KERNEL("Sqrt", "op_Sqrt");
+REGISTER_KERNEL("Rsqrt", "op_Rsqrt");
+REGISTER_KERNEL("Square", "op_Square");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -51,6 +56,11 @@ extern "C" {
   int op_Floor(const void* arg, size_t len);
   int op_Transpose(const void* arg, size_t len);
   int op_MatMul(const void* arg, size_t len);
+  int op_Minimum(const void* arg, size_t len);
+  int op_Maximum(const void* arg, size_t len);
+  int op_Sqrt(const void* arg, size_t len);
+  int op_Rsqrt(const void* arg, size_t len);
+  int op_Square(const void* arg, size_t len);
 }
 
 namespace {
@@ -1022,3 +1032,230 @@ int op_MatMul(const void* args, size_t len)
   return ret;
 }
 
+//
+// Minimum
+//
+
+namespace {
+template <typename T>
+int minimum_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = pi0[i] < i1 ? pi0[i] : i1;
+  }
+  return 0;
+}
+}
+
+int op_Minimum(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << ": begin";
+  struct Args {
+    int dtype;
+    uint64_t in0;
+    uint64_t in1;
+    uint64_t out;
+    int32_t dims_in0;
+    int32_t dims_in1;
+    int32_t dims_out;
+    int64_t nelems_in0;
+    int64_t nelems_in1;
+    int64_t nelems_out;
+    int64_t dim_size_in0[8];
+    int64_t dim_size_in1[8];
+    int64_t dim_size_out[8];
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  LOG(3) << __FUNCTION__ << ":"
+    << " dims_in0=" << p->dims_in0
+    << " dims_in1=" << p->dims_in1
+    << " dims_out=" << p->dims_out
+    << " nelems_in0=" << p->nelems_in0
+    << " nelems_in1=" << p->nelems_in1
+    << " nelems_out=" << p->nelems_out;
+
+  int ret = 0;
+
+  if (p->dtype == DT_FLOAT) {
+    if (p->nelems_in0 == 1) {
+      assert(p->nelems_in1 == p->nelems_out);
+      ret = minimum_n1<float>(p->out, p->in1, p->in0, p->nelems_out);
+    } else if (p->nelems_in1 == 1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      ret = minimum_n1<float>(p->out, p->in0, p->in1, p->nelems_out);
+#if 0
+    } else if (p->nelems_in0 == p->nelems_in1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      ret = add_n_n<float>(p->out, p->in0, p->in1, p->nelems_out);
+#endif
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
+
+  return ret;
+}
+
+//
+// Minimum
+//
+
+namespace {
+template <typename T>
+int maximum_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = pi0[i] > i1 ? pi0[i] : i1;
+  }
+  return 0;
+}
+}
+
+int op_Maximum(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << ": begin";
+  struct Args {
+    int dtype;
+    uint64_t in0;
+    uint64_t in1;
+    uint64_t out;
+    int32_t dims_in0;
+    int32_t dims_in1;
+    int32_t dims_out;
+    int64_t nelems_in0;
+    int64_t nelems_in1;
+    int64_t nelems_out;
+    int64_t dim_size_in0[8];
+    int64_t dim_size_in1[8];
+    int64_t dim_size_out[8];
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  LOG(3) << __FUNCTION__ << ":"
+    << " dims_in0=" << p->dims_in0
+    << " dims_in1=" << p->dims_in1
+    << " dims_out=" << p->dims_out
+    << " nelems_in0=" << p->nelems_in0
+    << " nelems_in1=" << p->nelems_in1
+    << " nelems_out=" << p->nelems_out;
+
+  int ret = 0;
+
+  if (p->dtype == DT_FLOAT) {
+    if (p->nelems_in0 == 1) {
+      assert(p->nelems_in1 == p->nelems_out);
+      ret = maximum_n1<float>(p->out, p->in1, p->in0, p->nelems_out);
+    } else if (p->nelems_in1 == 1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      ret = maximum_n1<float>(p->out, p->in0, p->in1, p->nelems_out);
+#if 0
+    } else if (p->nelems_in0 == p->nelems_in1) {
+      assert(p->nelems_in0 == p->nelems_out);
+      ret = add_n_n<float>(p->out, p->in0, p->in1, p->nelems_out);
+#endif
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << ": end. ret=" << ret;
+
+  return ret;
+}
+
+namespace {
+
+int unary_op(const void* args, size_t len,
+             int (*func_f32_f32)(uint64_t, uint64_t, size_t))
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct _Tensor {
+    int dtype;
+    int data_format;
+    uint64_t addr;
+    int32_t dims;
+    int64_t nelems;
+    int64_t dim_size[8];
+  };
+
+  struct Args {
+    _Tensor in;
+    _Tensor out;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  int ret = 1;
+  if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
+    ret = func_f32_f32(p->out.addr, p->in.addr, p->in.nelems);
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret;
+}
+
+template<typename Tin, typename Tout>
+int sqrt_(uint64_t out, uint64_t in, size_t nelems)
+{
+  Tout* po = reinterpret_cast<Tout*>(out);
+  const Tin* pi = reinterpret_cast<Tin*>(in);
+
+  for (int64_t i = 0; i < nelems; ++i) {
+    po[i] = std::sqrt(pi[i]);
+  }
+  return 0;
+}
+
+template<typename Tin, typename Tout>
+int rsqrt(uint64_t out, uint64_t in, size_t nelems)
+{
+  Tout* po = reinterpret_cast<Tout*>(out);
+  const Tin* pi = reinterpret_cast<Tin*>(in);
+
+  for (int64_t i = 0; i < nelems; ++i) {
+    po[i] = Tin(1) / std::sqrt(pi[i]);
+  }
+  return 0;
+}
+
+
+template<typename Tin, typename Tout>
+int square(uint64_t out, uint64_t in, size_t nelems)
+{
+  Tout* po = reinterpret_cast<Tout*>(out);
+  const Tin* pi = reinterpret_cast<Tin*>(in);
+
+  for (int64_t i = 0; i < nelems; ++i) {
+    po[i] = pi[i] * pi[i];
+  }
+  return 0;
+}
+}
+
+int op_Sqrt(const void* args, size_t len)
+{
+  return unary_op(args, len, sqrt_<float, float>);
+}
+
+int op_Rsqrt(const void* args, size_t len)
+{
+  return unary_op(args, len, rsqrt<float, float>);
+}
+
+int op_Square(const void* args, size_t len)
+{
+  return unary_op(args, len, square<float, float>);
+}
