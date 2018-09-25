@@ -4,10 +4,14 @@
 #include "log.h"
 #include <sstream>
 
+#include <asl.h>
+
 REGISTER_KERNEL("Select", "op_Select");
+REGISTER_KERNEL("RandomUniform", "op_RandomUniform");
 
 extern "C" {
   int op_Select(const void* args, size_t len);
+  int op_RandomUniform(const void* args, size_t len);
 }
 
 namespace {
@@ -102,10 +106,45 @@ int op_select(const VEOpArgs& args)
   return 0;
 }
 
+int op_randomUniform(const VEOpArgs& args)
+{
+  if (args.ninputs != 0 && args.noutputs != 1)
+    return 1;
+
+  LOG(3) << "op_RandomUniform: nelems=" << args.output[0].nelems;
+
+  asl_random_t hnd;
+
+  if (asl_random_create(&hnd, ASL_RANDOMMETHOD_AUTO) != ASL_ERROR_OK) {
+    fprintf(stderr, "asl_random_create failed\n");
+    exit(-1);
+  }
+
+  if (args.output[0].dtype == DT_FLOAT) {
+    float* p = reinterpret_cast<float*>(args.output[0].addr);
+    if (asl_random_generate_s(hnd, args.output[0].nelems, p) != ASL_ERROR_OK) {
+      fprintf(stderr, "asl_random_generate_d failed\n");
+      exit(-1);
+    }
+  }
+
+  if (asl_random_destroy(hnd) != ASL_ERROR_OK) {
+    fprintf(stderr, "asl_random_destroy failed\n");
+    exit(-1);
+  }
+
+  return 0;
+}
+
 } // namespace
 
 int op_Select(const void* args, size_t len)
 {
   return op_Kernel(args, len, op_select, "op_Select");
+}
+
+int op_RandomUniform(const void* args, size_t len)
+{
+  return op_Kernel(args, len, op_randomUniform, "op_RandomUniform");
 }
 

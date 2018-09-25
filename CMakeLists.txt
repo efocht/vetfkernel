@@ -8,6 +8,7 @@ set(CMAKE_CXX_COMPILER /opt/nec/ve/bin/nc++)
 set(VEDNN_PATH ${CMAKE_SOURCE_DIR}/vednn CACHE PATH "path to vednn")
 
 add_library(vetfkernel STATIC
+        src/asl.cc
 	src/libvetfkernel.cc
 	src/conv2d.cc
 	src/conv2d_backprop_filter.cc

@@ -703,7 +703,7 @@ template<> void blas_gemm<float>(GEMM_ARGS(float)) { sgemm_(GEMM_REAL_ARGS); }
 template<typename T, char TransA, char TransB>
   int matmul(uint64_t c, uint64_t a, uint64_t b, int M, int N, int K)
   {
-    LOG(2) << __FUNCTION__ << " begin: (" << M << "," << N << "," << K << ")";
+    LOG(3) << __FUNCTION__ << " begin: (" << M << "," << N << "," << K << ")";
     T* C = reinterpret_cast<T*>(c);
     const T* A = reinterpret_cast<const T*>(a);
     const T* B = reinterpret_cast<const T*>(b);
@@ -716,7 +716,6 @@ template<typename T, char TransA, char TransB>
     int lda = TransA == 'N' ? K : M;
     int ldb = TransB == 'N' ? N : K;
 
-    //blas_gemm<T>(&transa, &transb, &N, &M, &K, &alpha, B, &N, A, &K, &beta, C, &N);
     blas_gemm<T>(&transb, &transa, &N, &M, &K, &alpha, B, &ldb, A, &lda, &beta, C, &N);
     LOG(2) << __FUNCTION__ << " end";
     return 0;
