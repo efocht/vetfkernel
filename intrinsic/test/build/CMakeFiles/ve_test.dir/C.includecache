@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/usr/uhome/aurora/4gi/ideguchi/ve-tensorflow/libvetfkernel/intrinsic/libvetfkernel.h
+
+/usr/uhome/aurora/4gi/ideguchi/ve-tensorflow/libvetfkernel/intrinsic/libvetfkernel_BiasAdd.c
+stdint.h
+-
+float.h
+-
+stdio.h
+-
+libvetfkernel.h
+/usr/uhome/aurora/4gi/ideguchi/ve-tensorflow/libvetfkernel/intrinsic/libvetfkernel.h
+veintrin.h
+/usr/uhome/aurora/4gi/ideguchi/ve-tensorflow/libvetfkernel/intrinsic/veintrin.h
+

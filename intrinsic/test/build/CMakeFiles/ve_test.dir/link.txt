@@ -1,0 +1,1 @@
+/opt/nec/ve/bin/nc++    -rdynamic CMakeFiles/ve_test.dir/test.cpp.o CMakeFiles/ve_test.dir/usr/uhome/aurora/4gi/ideguchi/ve-tensorflow/libvetfkernel/intrinsic/libvetfkernel_BiasAdd.c.o  -o ve_test -L/usr/uhome/aurora/mpc/pub/veperf/latest/lib -lveperf -lsysve -ftrace 
