@@ -19,6 +19,8 @@ add_library(vetfkernel STATIC
         src/ve_ops.cc
         src/binary_ops.cc)
 
+target_compile_options(vetfkernel PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
+
 target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH})
 target_include_directories(vetfkernel PRIVATE /opt/nec/ve/nlc/1.0.0/include)
 

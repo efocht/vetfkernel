@@ -7,6 +7,8 @@
 #include "types.h"
 #include "log.h"
 
+#include <omp.h>
+
 #include "vednn.h"
 
 #define ADD_
@@ -716,7 +718,24 @@ template<typename T, char TransA, char TransB>
     int lda = TransA == 'N' ? K : M;
     int ldb = TransB == 'N' ? N : K;
 
-    blas_gemm<T>(&transb, &transa, &N, &M, &K, &alpha, B, &ldb, A, &lda, &beta, C, &N);
+#pragma omp parallel
+    {
+      int nthreads = omp_get_num_threads() ;
+      int threadid = omp_get_thread_num() ;
+
+      int chunkSize = M / nthreads ;
+      int remain    = M % nthreads ;
+
+      int chunkBegin = chunkSize * threadid + ( threadid < remain ? threadid : remain ) ;
+      int myChunk    = chunkSize + ( threadid < remain ? 1 : 0 ) ;
+
+      int offset    = TransA == 'N' ? K : 1 ;
+
+      if( myChunk > 0 ) {
+        blas_gemm<T>(&transb, &transa, &N, &myChunk, &K, &alpha, B, &ldb, A+offset*chunkBegin, &lda, &beta, C+N*chunkBegin, &N);
+      }
+    }
+
     LOG(2) << __FUNCTION__ << " end";
     return 0;
   }
