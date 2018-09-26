@@ -11,6 +11,13 @@
 
 #include "vednn.h"
 
+
+#define LIBVETF_INTRINSIC
+
+#ifdef LIBVETF_INTRINSIC
+#include "libvetfkernel.h"
+#endif
+
 #define ADD_
 #include <cblas_f77.h>
 #undef ADD_
@@ -171,7 +178,7 @@ int op_AddN(const void* args, size_t len)
 
   return 0;
 }
-
+#ifndef LIBVETF_INTRINSIC
 namespace {
 
 template<typename T>
@@ -226,7 +233,7 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 }
 
 };
-
+#endif
 int op_BiasAdd(const void* args, size_t len)
 {
   LOG(1) << __FUNCTION__;
@@ -251,11 +258,23 @@ int op_BiasAdd(const void* args, size_t len)
           __FUNCTION__, p->dtype, p->data_format, p->batch, p->width, p->height, p->channel);
 #endif
 
+#ifndef LIBVETF_INTRINSIC
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
     return BiasAdd_NHWC<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
   } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
     return BiasAdd_NCHW<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
   }
+#else
+  if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
+    return BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+    return BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+  }
+
+#endif
+
+
+
 #if 0
   fprintf(stderr, "%s done\n", __PRETTY_FUNCTION__);
 #endif

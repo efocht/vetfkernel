@@ -32,11 +32,12 @@ int BiasAdd_NHWC(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 #ifdef SET_TIMER
 	unsigned long long start = __veperf_get_stm();
 #endif
-	if(width*height>channel){
-		for (int b = 0; b < batch; ++b) {
-			for (int xy = 0; xy < width*height; xy+=VLEN) {
-				const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
-				_ve_lvl(vlen) ;
+
+	if((channel<64)&&(width*height>channel)){
+		for (int xy = 0; xy < width*height; xy+=VLEN) {
+			const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
+			_ve_lvl(vlen) ;
+			for (int b = 0; b < batch; ++b) {
 				int i = b * height * width * channel
 					+ xy * channel;
 				for (int c = 0; c < channel; ++c) {
@@ -47,17 +48,17 @@ int BiasAdd_NHWC(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 			}
 		}
 	}else{
-		for (int b = 0; b < batch; ++b) {
-			for (int c = 0; c < channel; c+=VLEN) {
-				const int64_t vlen = channel-c < VLEN ? channel-c : VLEN;
-				_ve_lvl(vlen) ;
-				__vr vr_pbias = _ve_vldu_vss(4,pbias+c);
+		for (int c = 0; c < channel; c+=VLEN) {
+			const int64_t vlen = channel-c < VLEN ? channel-c : VLEN;
+			_ve_lvl(vlen) ;
+			__vr vr_pbias = _ve_vldu_vss(4,pbias+c);
+			for (int b = 0; b < batch; ++b) {
 				for (int xy = 0; xy < width*height; xy++) {
 					int i = b * height * width * channel
 						+ xy * channel;
-					__vr vr_pin = _ve_vldu_vss(4*channel,pin+i+c);
+					__vr vr_pin = _ve_vldu_vss(4,pin+i+c);
 					__vr vr_sum = _ve_vfadds_vvv(vr_pbias, vr_pin);
-					_ve_vstu_vss(vr_sum,4*channel,pout+i+c);
+					_ve_vstu_vss(vr_sum,4,pout+i+c);
 				}
 			}
 		}
@@ -127,10 +128,10 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 
 #if 1
 	if(wh%2==0){
-		for (int b = 0; b < batch; ++b) {
-			for (int xy = 0; xy < width*height; xy+=2*VLEN) {
-				const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
-				_ve_lvl(vlen) ;
+		for (int xy = 0; xy < width*height; xy+=2*VLEN) {
+			const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
+			_ve_lvl(vlen) ;
+			for (int b = 0; b < batch; ++b) {
 				for (int c = 0; c < channel; ++c) {
 					int i = b * height * width * channel
 						+ c * height * width;
@@ -142,10 +143,10 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 			}
 		}
 	}else{
-		for (int b = 0; b < batch; ++b) {
-			for (int xy = 0; xy < width*height; xy+=VLEN) {
-				const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
-				_ve_lvl(vlen) ;
+		for (int xy = 0; xy < width*height; xy+=VLEN) {
+			const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
+			_ve_lvl(vlen) ;
+			for (int b = 0; b < batch; ++b) {	
 				for (int c = 0; c < channel; ++c) {
 					int i = b * height * width * channel
 						+ c * height * width;
