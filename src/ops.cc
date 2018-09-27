@@ -267,7 +267,11 @@ int op_BiasAdd(const void* args, size_t len)
 #else
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
     return BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+//printf("add hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
+  
+} else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+//printf("add chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
+
     return BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
   }
 
@@ -281,6 +285,7 @@ int op_BiasAdd(const void* args, size_t len)
   return 1;
 }
 
+#ifndef LIBVETF_INTRINSIC
 namespace {
 
 template<typename T>
@@ -335,7 +340,7 @@ int BiasAddGrad_NCHW(uint64_t output, uint64_t output_backprop, int batch, int w
 }
 
 };
-
+#endif
 int op_BiasAddGrad(const void* args, size_t len)
 {
   LOG(2) << __FUNCTION__;
@@ -359,11 +364,24 @@ int op_BiasAddGrad(const void* args, size_t len)
           __FUNCTION__, p->dtype, p->data_format, p->batch, p->width, p->height, p->channel);
 #endif
 
+#ifndef LIBVETF_INTRINSIC
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
     return BiasAddGrad_NHWC<float>(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
   } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
     return BiasAddGrad_NCHW<float>(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
   }
+#else
+  if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
+//printf("grad hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);    
+return BiasAddGrad_NHWC(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
+  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+//printf("grad chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
+
+    return BiasAddGrad_NCHW(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
+
+  }
+#endif
+
   LOG(2) << __FUNCTION__ << " done";
   return 1;
 }

@@ -77,7 +77,7 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 		for (int b = 0; b < batch; ++b) {
 			for (int c = 0; c < channel; ++c) {
 				for (int xy = 0; xy < width*height; xy+=2*VLEN) {
-					const int64_t vlen = width*height-xy < VLEN ? width*height-xy : VLEN;
+					const int64_t vlen = (width*height-xy < 2*VLEN ? width*height-xy : 2*VLEN) >> 1;
 					_ve_lvl(vlen) ;
 					int i = b * height * width * channel
 						+ c * height * width;

@@ -20,7 +20,8 @@ add_library(vetfkernel STATIC
         src/ops.cc
         src/ve_ops.cc
         src/binary_ops.cc
-	src/intrinsic/libvetfkernel_BiasAdd.c)
+	src/intrinsic/libvetfkernel_BiasAdd.c
+	src/intrinsic/libvetfkernel_BiasAddGrad.c)
 
 target_compile_options(vetfkernel PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
 
