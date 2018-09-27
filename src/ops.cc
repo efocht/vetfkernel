@@ -266,11 +266,11 @@ int op_BiasAdd(const void* args, size_t len)
   }
 #else
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
+printf("add hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
     return BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-//printf("add hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
   
 } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-//printf("add chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
+printf("add chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
 
     return BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
   }
@@ -372,10 +372,10 @@ int op_BiasAddGrad(const void* args, size_t len)
   }
 #else
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
-//printf("grad hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);    
+printf("grad hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);    
 return BiasAddGrad_NHWC(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
   } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-//printf("grad chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
+printf("grad chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
 
     return BiasAddGrad_NCHW(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
 

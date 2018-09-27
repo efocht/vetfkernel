@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 set(CMAKE_C_COMPILER /proj/share/local/x86_64/llvm/bin/clang)
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target ve -O2 -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target ve -O3 -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics")
 #set(CMAKE_C_COMPILER /opt/nec/ve/bin/ncc)
 set(CMAKE_CXX_COMPILER /opt/nec/ve/bin/nc++)
 

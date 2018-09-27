@@ -23,7 +23,7 @@ int BiasAddGrad_NHWC(uint64_t output, uint64_t output_backprop, int batch, int w
 	const uint64_t alignOut = ((const uint64_t)output) & 0x07;
 	const uint64_t alignIn = ((const uint64_t)output_backprop) & 0x07;
 
-	if((alignIn==0)&&(alignOut==0)&&(channel%2==0)){
+	if((alignIn==0)&&(alignOut==0)&&(channel%2==0)&&(channel>256)){
 		for (int c = 0; c < channel; c+=2*VLEN) {
 			const int64_t vlen = (channel-c < 2*VLEN ? channel : 2*VLEN) >> 1;
 			_ve_lvl(vlen);
@@ -40,8 +40,6 @@ int BiasAddGrad_NHWC(uint64_t output, uint64_t output_backprop, int batch, int w
 		}
 
 	}else{
-
-
 		for (int c = 0; c < channel; c+=VLEN) {
 			const int64_t vlen = channel-c < VLEN ? channel : VLEN;
 			_ve_lvl(vlen);
@@ -57,6 +55,8 @@ int BiasAddGrad_NHWC(uint64_t output, uint64_t output_backprop, int batch, int w
 			_ve_vstu_vss(vr_sum,4,pout+c);
 		}
 	}
+
+
 
 #elif 0
 	memset(pout, 0, sizeof(float) * channel);
