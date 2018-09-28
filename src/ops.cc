@@ -19,7 +19,7 @@
 #endif
 
 
-#define SET_TIMER
+//#define SET_TIMER
 
 
 #ifdef SET_TIMER
