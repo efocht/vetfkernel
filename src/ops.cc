@@ -18,6 +18,24 @@
 #include "libvetfkernel.h"
 #endif
 
+
+#define SET_TIMER
+
+
+#ifdef SET_TIMER
+#ifdef __ve__
+static inline unsigned long long __veperf_get_stm() {
+        void *vehva = (void *)0x1000;
+        unsigned long long val;
+        asm volatile ("lhm.l %0,0(%1)":"=r"(val):"r"(vehva));
+        return val;
+}
+#endif
+#endif
+
+
+
+
 #define ADD_
 #include <cblas_f77.h>
 #undef ADD_
@@ -265,16 +283,32 @@ int op_BiasAdd(const void* args, size_t len)
     return BiasAdd_NCHW<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
   }
 #else
+  int r=0;
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
-printf("add hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
-    return BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-  
-} else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-printf("add chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+    r = BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("add hwc, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
+#endif  
 
-    return BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+} else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+    r = BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("add chw, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
+#endif
+
   }
 
+
+
+return r;
 #endif
 
 
@@ -371,15 +405,27 @@ int op_BiasAddGrad(const void* args, size_t len)
     return BiasAddGrad_NCHW<float>(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
   }
 #else
+int r;
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
-printf("grad hwc, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);    
-return BiasAddGrad_NHWC(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+  r = BiasAddGrad_NHWC(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("grad hwc, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));    
+#endif
   } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-printf("grad chw, nchw %d %d %d %d\n",p->batch,p->channel,p->width, p->height);
-
-    return BiasAddGrad_NCHW(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
-
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+    r =  BiasAddGrad_NCHW(p->output, p->output_backprop, p->batch, p->width, p->height, p->channel);
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("grad chw, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
+#endif
   }
+  return r;
 #endif
 
   LOG(2) << __FUNCTION__ << " done";
