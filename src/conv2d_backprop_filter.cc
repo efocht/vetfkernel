@@ -126,6 +126,7 @@ int conv2d_backprop_filter(const void* arg, size_t len)
     if( transformed_bp_filter != NULL ) {
       float * filter_bp = (float *) p.filter_bp ;     
 
+#if 0
       for(int n=0; n<N ; n++) {
         for(int c=0; c<C ; c++) {
           for(int h=0; h<H ; h++) {
@@ -135,6 +136,15 @@ int conv2d_backprop_filter(const void* arg, size_t len)
           }
         }
       }
+#else
+      for(int n=0; n<N ; n++) {
+        for(int c=0; c<C ; c++) {
+          for(int hw=0; hw<H*W ; hw++) {
+            filter_bp[((hw)*C+c)*N+n] = transformed_bp_filter[((n*C+c)*H)*W+hw] ;
+          }
+        }
+      }
+#endif
       free(transformed_bp_filter) ;
     }
 #ifdef _DEBUG

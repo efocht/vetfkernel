@@ -75,7 +75,7 @@ int conv2d(const void* arg, size_t len)
       float * filter = (float *) p.filter ;     
 
       transformed_filter = (float *) malloc(sizeof(float)*N*C*H*W) ;
-
+#if 0
       for(int n=0; n<N ; n++) {
         for(int c=0; c<C ; c++) {
           for(int h=0; h<H ; h++) {
@@ -85,6 +85,15 @@ int conv2d(const void* arg, size_t len)
           }
         }
       }
+#else
+      for(int n=0; n<N ; n++) {
+        for(int c=0; c<C ; c++) {
+          for(int hw=0; hw<H*W ; hw++) {
+            transformed_filter[((n*C+c)*H)*W+hw] = filter[((hw)*C+c)*N+n] ; 
+          }
+        }
+      }
+#endif
     }
     
     void *pIn     = (void *) p.in ;
