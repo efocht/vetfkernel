@@ -12,6 +12,19 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
 int BiasAddGrad_NHWC(uint64_t output, uint64_t output_backprop, int batch, int width, int height, int channel);
 int BiasAddGrad_NCHW(uint64_t output, uint64_t output_backprop, int batch, int width, int height, int channel);
 
+
+int add_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int add_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+
+int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+
+int mul_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int mul_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+
+int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1);
+
+
 #ifdef __cplusplus
 }
 #endif
