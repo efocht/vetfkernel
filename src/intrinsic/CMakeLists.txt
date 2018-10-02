@@ -5,4 +5,8 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target ve -O3 -fno-vectorize -fno-slp-vecto
 
 add_library(vetfkernel_intrinsic OBJECT
 	libvetfkernel_BiasAdd.c
-	libvetfkernel_BiasAddGrad.c)
+	libvetfkernel_BiasAddGrad.c
+	libvetfkernel_Add.c
+	libvetfkernel_Sub.c
+	libvetfkernel_Mul.c
+	libvetfkernel_Div.c)
