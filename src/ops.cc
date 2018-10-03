@@ -852,7 +852,7 @@ int op_MatMul(const void* args, size_t len)
   if (p->dtype == DT_FLOAT) {
     if (!p->transpose_a && !p->transpose_b) {
       assert(p->dim_size_a[1] == p->dim_size_b[0]);
-#if 1
+#if 0
       ret = matmul<float, 'N', 'N'>(
           p->out, p->a, p->b, p->dim_size_a[0], p->dim_size_b[1], p->dim_size_a[1]);
 #else
