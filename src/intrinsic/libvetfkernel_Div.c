@@ -95,10 +95,9 @@ int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1)
 	const float* pi1 = (const float*)(in1);
 
 	if((n0>VLEN/3)&&(n0%4==0)){
-		int temp_num = n0<VLEN ? n0:VLEN;
 		if(n1<=VLEN){
 			if(n0<=VLEN){
-				float temp[temp_num];
+				float temp[VLEN];
 				_ve_lvl(n0);
 				__vr vr_pin = _ve_vldu_vss(4,pi1);
 				__vr vr_div = _ve_vfdivs_vsv(1.0f, vr_pin);
@@ -126,8 +125,7 @@ int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1)
 					}
 				}
 			}else{
-				float *temp = (float *)malloc( sizeof(float) * temp_num );
-				//float temp[temp_num];
+				float temp[VLEN];
 				for (size_t i = 0; i < n0; i+=VLEN) {
 					const int64_t vlen = n0-i < VLEN ? n0-i : VLEN;
 					_ve_lvl(vlen);
@@ -159,8 +157,7 @@ int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1)
 				}
 			}
 		}else{
-			float *temp = (float *)malloc( sizeof(float) * temp_num );
-			//float temp[temp_num];
+			float temp[VLEN];
 			for (size_t i = 0; i < n0; i+=VLEN) {
 				const int64_t vlen = n0-i < VLEN ? n0-i : VLEN;
 				_ve_lvl(vlen);
