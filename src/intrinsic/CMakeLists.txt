@@ -10,3 +10,7 @@ add_library(vetfkernel_intrinsic OBJECT
 	libvetfkernel_Sub.c
 	libvetfkernel_Mul.c
 	libvetfkernel_Div.c)
+#	libvetfkernel_Sqrt.c
+#	libvetfkernel_Rsqrt.c
+#	libvetfkernel_Square.c)
+

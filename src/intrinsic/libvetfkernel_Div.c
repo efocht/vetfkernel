@@ -94,69 +94,104 @@ int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1)
 	const float* pi0 = (const float*)(in0);
 	const float* pi1 = (const float*)(in1);
 
-	if(n0>VLEN/3){
-		if(n1<VLEN){
-			float temp[n0];
-			for (size_t i = 0; i < n0; i+=VLEN) {
-				const int64_t vlen = n0-i < VLEN ? n0-i : VLEN;
-				_ve_lvl(vlen);
-				__vr vr_pin = _ve_vldu_vss(4,pi1+i);
+	if((n0>VLEN/3)&&(n0%4==0)){
+		int temp_num = n0<VLEN ? n0:VLEN;
+		if(n1<=VLEN){
+			if(n0<=VLEN){
+				float temp[temp_num];
+				_ve_lvl(n0);
+				__vr vr_pin = _ve_vldu_vss(4,pi1);
 				__vr vr_div = _ve_vfdivs_vsv(1.0f, vr_pin);
-				_ve_vstu_vss(vr_div,4,temp+i);
-			}
-			_ve_lvl(n1);
-			for (size_t i = 0; i < n0; i+=4) {
-				float dval1 = temp[i+0];
-				float dval2 = temp[i+1];
-				float dval3 = temp[i+2];
-				float dval4 = temp[i+3];
-				for (size_t j = 0; j < n1; j+=VLEN) {
-					__vr vr_pin1 = _ve_vldu_vss(4,pi0+(i+0)*n1+j);
-					__vr vr_pin2 = _ve_vldu_vss(4,pi0+(i+1)*n1+j);
-					__vr vr_pin3 = _ve_vldu_vss(4,pi0+(i+2)*n1+j);
-					__vr vr_pin4 = _ve_vldu_vss(4,pi0+(i+3)*n1+j);
-					__vr vr_mul1 = _ve_vfmuls_vsv(dval1, vr_pin1);
-					__vr vr_mul2 = _ve_vfmuls_vsv(dval2, vr_pin2);
-					__vr vr_mul3 = _ve_vfmuls_vsv(dval3, vr_pin3);
-					__vr vr_mul4 = _ve_vfmuls_vsv(dval4, vr_pin4);
-					_ve_vstu_vss(vr_mul1,4,po+(i+0)*n1+j);
-					_ve_vstu_vss(vr_mul2,4,po+(i+1)*n1+j);
-					_ve_vstu_vss(vr_mul3,4,po+(i+2)*n1+j);
-					_ve_vstu_vss(vr_mul4,4,po+(i+3)*n1+j);
+				_ve_vstu_vss(vr_div,4,temp);
+
+				for (int ii = 0 ; ii < n0; ii+=4) {
+					float dval1 = temp[ii+0];
+					float dval2 = temp[ii+1];
+					float dval3 = temp[ii+2];
+					float dval4 = temp[ii+3];
+					_ve_lvl(n1);
+					for (size_t j = 0; j < n1; j+=VLEN) {
+						__vr vr_pin1 = _ve_vldu_vss(4,pi0+(ii+0)*n1+j);
+						__vr vr_pin2 = _ve_vldu_vss(4,pi0+(ii+1)*n1+j);
+						__vr vr_pin3 = _ve_vldu_vss(4,pi0+(ii+2)*n1+j);
+						__vr vr_pin4 = _ve_vldu_vss(4,pi0+(ii+3)*n1+j);
+						__vr vr_mul1 = _ve_vfmuls_vsv(dval1, vr_pin1);
+						__vr vr_mul2 = _ve_vfmuls_vsv(dval2, vr_pin2);
+						__vr vr_mul3 = _ve_vfmuls_vsv(dval3, vr_pin3);
+						__vr vr_mul4 = _ve_vfmuls_vsv(dval4, vr_pin4);
+						_ve_vstu_vss(vr_mul1,4,po+(ii+0)*n1+j);
+						_ve_vstu_vss(vr_mul2,4,po+(ii+1)*n1+j);
+						_ve_vstu_vss(vr_mul3,4,po+(ii+2)*n1+j);
+						_ve_vstu_vss(vr_mul4,4,po+(ii+3)*n1+j);
+					}
+				}
+			}else{
+				float *temp = (float *)malloc( sizeof(float) * temp_num );
+				//float temp[temp_num];
+				for (size_t i = 0; i < n0; i+=VLEN) {
+					const int64_t vlen = n0-i < VLEN ? n0-i : VLEN;
+					_ve_lvl(vlen);
+					__vr vr_pin = _ve_vldu_vss(4,pi1+i);
+					__vr vr_div = _ve_vfdivs_vsv(1.0f, vr_pin);
+					_ve_vstu_vss(vr_div,4,temp);
+
+					for (int ii = i ; ii < vlen+i; ii+=4) {
+						float dval1 = temp[ii+0];
+						float dval2 = temp[ii+1];
+						float dval3 = temp[ii+2];
+						float dval4 = temp[ii+3];
+						_ve_lvl(n1);
+						for (size_t j = 0; j < n1; j+=VLEN) {
+							__vr vr_pin1 = _ve_vldu_vss(4,pi0+(ii+0)*n1+j);
+							__vr vr_pin2 = _ve_vldu_vss(4,pi0+(ii+1)*n1+j);
+							__vr vr_pin3 = _ve_vldu_vss(4,pi0+(ii+2)*n1+j);
+							__vr vr_pin4 = _ve_vldu_vss(4,pi0+(ii+3)*n1+j);
+							__vr vr_mul1 = _ve_vfmuls_vsv(dval1, vr_pin1);
+							__vr vr_mul2 = _ve_vfmuls_vsv(dval2, vr_pin2);
+							__vr vr_mul3 = _ve_vfmuls_vsv(dval3, vr_pin3);
+							__vr vr_mul4 = _ve_vfmuls_vsv(dval4, vr_pin4);
+							_ve_vstu_vss(vr_mul1,4,po+(ii+0)*n1+j);
+							_ve_vstu_vss(vr_mul2,4,po+(ii+1)*n1+j);
+							_ve_vstu_vss(vr_mul3,4,po+(ii+2)*n1+j);
+							_ve_vstu_vss(vr_mul4,4,po+(ii+3)*n1+j);
+						}
+					}
 				}
 			}
 		}else{
-			float temp[n0];
+			float *temp = (float *)malloc( sizeof(float) * temp_num );
+			//float temp[temp_num];
 			for (size_t i = 0; i < n0; i+=VLEN) {
 				const int64_t vlen = n0-i < VLEN ? n0-i : VLEN;
 				_ve_lvl(vlen);
 				__vr vr_pin = _ve_vldu_vss(4,pi1+i);
 				__vr vr_div = _ve_vfdivs_vsv(1.0f, vr_pin);
-				_ve_vstu_vss(vr_div,4,temp+i);
-			}
-			for (size_t i = 0; i < n0; i+=4) {
-				float dval1 = temp[i+0];
-				float dval2 = temp[i+1];
-				float dval3 = temp[i+2];
-				float dval4 = temp[i+3];
-				for (size_t j = 0; j < n1; j+=VLEN) {
-					const int64_t vlen = n1-j < VLEN ? n1-j : VLEN;
-					_ve_lvl(n1);
-					__vr vr_pin1 = _ve_vldu_vss(4,pi0+(i+0)*n1+j);
-					__vr vr_pin2 = _ve_vldu_vss(4,pi0+(i+1)*n1+j);
-					__vr vr_pin3 = _ve_vldu_vss(4,pi0+(i+2)*n1+j);
-					__vr vr_pin4 = _ve_vldu_vss(4,pi0+(i+3)*n1+j);
-					__vr vr_mul1 = _ve_vfmuls_vsv(dval1, vr_pin1);
-					__vr vr_mul2 = _ve_vfmuls_vsv(dval2, vr_pin2);
-					__vr vr_mul3 = _ve_vfmuls_vsv(dval3, vr_pin3);
-					__vr vr_mul4 = _ve_vfmuls_vsv(dval4, vr_pin4);
-					_ve_vstu_vss(vr_mul1,4,po+(i+0)*n1+j);
-					_ve_vstu_vss(vr_mul2,4,po+(i+1)*n1+j);
-					_ve_vstu_vss(vr_mul3,4,po+(i+2)*n1+j);
-					_ve_vstu_vss(vr_mul4,4,po+(i+3)*n1+j);
+				_ve_vstu_vss(vr_div,4,temp);
+
+				for (int ii = i ; ii < vlen+i; ii+=4) {
+					float dval1 = temp[ii+0];
+					float dval2 = temp[ii+1];
+					float dval3 = temp[ii+2];
+					float dval4 = temp[ii+3];
+					for (size_t j = 0; j < n1; j+=VLEN) {
+						const int64_t vlen1 = n1-j < VLEN ? n1-j : VLEN;
+						_ve_lvl(vlen1);
+
+						__vr vr_pin1 = _ve_vldu_vss(4,pi0+(ii+0)*n1+j);
+						__vr vr_pin2 = _ve_vldu_vss(4,pi0+(ii+1)*n1+j);
+						__vr vr_pin3 = _ve_vldu_vss(4,pi0+(ii+2)*n1+j);
+						__vr vr_pin4 = _ve_vldu_vss(4,pi0+(ii+3)*n1+j);
+						__vr vr_mul1 = _ve_vfmuls_vsv(dval1, vr_pin1);
+						__vr vr_mul2 = _ve_vfmuls_vsv(dval2, vr_pin2);
+						__vr vr_mul3 = _ve_vfmuls_vsv(dval3, vr_pin3);
+						__vr vr_mul4 = _ve_vfmuls_vsv(dval4, vr_pin4);
+						_ve_vstu_vss(vr_mul1,4,po+(ii+0)*n1+j);
+						_ve_vstu_vss(vr_mul2,4,po+(ii+1)*n1+j);
+						_ve_vstu_vss(vr_mul3,4,po+(ii+2)*n1+j);
+						_ve_vstu_vss(vr_mul4,4,po+(ii+3)*n1+j);
+					}
 				}
 			}
-
 		}
 	}else if(n0<n1){
 		for (size_t i = 0; i < n0; ++i) {

@@ -275,30 +275,27 @@ int op_BiasAdd(const void* args, size_t len)
   fprintf(stderr, "%s dtype=%d data_format=%d batch=%d width=%d height=%d channel=%d\n", 
           __FUNCTION__, p->dtype, p->data_format, p->batch, p->width, p->height, p->channel);
 #endif
-
-#ifndef LIBVETF_INTRINSIC
-  if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
-    return BiasAdd_NHWC<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-    return BiasAdd_NCHW<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-  }
-#else
   int r=0;
-  if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
+
+  if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
+#ifndef LIBVETF_INTRINSIC
+    r = BiasAdd_NHWC<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+#else
     r = BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+#endif
 #ifdef SET_TIMER
   unsigned long long end = __veperf_get_stm();
   printf("add hwc, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
-#endif  
-
-} else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
 #endif
+  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+#ifndef LIBVETF_INTRINSIC
+    r = BiasAdd_NCHW<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+#else
     r = BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
+#endif
 #ifdef SET_TIMER
   unsigned long long end = __veperf_get_stm();
   printf("add chw, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
@@ -308,9 +305,7 @@ int op_BiasAdd(const void* args, size_t len)
 
 
 
-return r;
-#endif
-
+  return r;
 
 
 #if 0
@@ -895,7 +890,7 @@ int unary_op(const void* args, size_t len,
     int64_t nelems;
     int64_t dim_size[8];
   };
-
+  
   struct Args {
     _Tensor in;
     _Tensor out;
@@ -912,6 +907,7 @@ int unary_op(const void* args, size_t len,
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
   return ret;
 }
+#if 1 //ndef LIBVETF_INTRINSIC
 
 template<typename Tin, typename Tout>
 int sqrt_(uint64_t out, uint64_t in, size_t nelems)
@@ -949,19 +945,59 @@ int square(uint64_t out, uint64_t in, size_t nelems)
   }
   return 0;
 }
+#endif
 }
 
 int op_Sqrt(const void* args, size_t len)
 {
-  return unary_op(args, len, sqrt_<float, float>);
+  int r = 0;
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+#if 1 //ndef LIBVETF_INTRINSIC
+  r = unary_op(args, len, sqrt_<float, float>);
+#else
+  r = unary_op(args, len, sqrt_);
+#endif
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("sqrt, len %d: %lf ms\n",len,(end-start)/(800e3));
+#endif
+  return r;
 }
 
 int op_Rsqrt(const void* args, size_t len)
 {
-  return unary_op(args, len, rsqrt<float, float>);
+  int r = 0;
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+#if 1 //ndef LIBVETF_INTRINSIC
+  r = unary_op(args, len, rsqrt<float, float>);
+#else
+  r = unary_op(args, len, rsqrt);
+#endif
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("rsqrt, len %d: %lf ms\n",len,(end-start)/(800e3));
+#endif
+  return r;
 }
 
 int op_Square(const void* args, size_t len)
 {
-  return unary_op(args, len, square<float, float>);
+  int r = 0;
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+#if 1 //ndef LIBVETF_INTRINSIC
+  r = unary_op(args, len, square<float, float>);
+#else
+  r = unary_op(args, len, square);
+#endif
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("square, len %d: %lf ms\n",len,(end-start)/(800e3));
+#endif
+  return r;
 }

@@ -24,6 +24,10 @@ int mul_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
 int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
 int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1);
 
+int sqrt_(uint64_t out, uint64_t in, size_t n);
+int rsqrt(uint64_t out, uint64_t in, size_t n);
+int square(uint64_t out, uint64_t in, size_t n);
+
 
 #ifdef __cplusplus
 }
