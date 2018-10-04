@@ -505,7 +505,7 @@ int op_Snapshot(const void* arg, size_t len)
 //
 // Neg
 //
-
+#if 1//ndef LIBVETF_INTRINSIC
 namespace {
 template<typename Tin, typename Tout>
   void neg(uint64_t out, uint64_t in, size_t nelems)
@@ -518,7 +518,7 @@ template<typename Tin, typename Tout>
     }
   }
 }
-
+#endif
 int op_Neg(const void* args, size_t len)
 {
   LOG(2) << __FUNCTION__ << " begin";
@@ -541,7 +541,20 @@ int op_Neg(const void* args, size_t len)
   p = reinterpret_cast<const Args*>(args);
 
   if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+#if 1//ndef LIBVETF_INTRINSIC
     neg<float, float>(p->out.addr, p->in.addr, p->in.nelems);
+#else
+    neg(p->out.addr, p->in.addr, p->in.nelems);
+#endif
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("neg, len %d:%lfms\n",p->in.nelems,(end-start)/(800e3));
+#endif
+
+
   } else {
     return 1;
   }
@@ -907,7 +920,7 @@ int unary_op(const void* args, size_t len,
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
   return ret;
 }
-#if 1 //ndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
 
 template<typename Tin, typename Tout>
 int sqrt_(uint64_t out, uint64_t in, size_t nelems)
@@ -954,7 +967,7 @@ int op_Sqrt(const void* args, size_t len)
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
-#if 1 //ndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
   r = unary_op(args, len, sqrt_<float, float>);
 #else
   r = unary_op(args, len, sqrt_);
@@ -972,7 +985,7 @@ int op_Rsqrt(const void* args, size_t len)
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
-#if 1 //ndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
   r = unary_op(args, len, rsqrt<float, float>);
 #else
   r = unary_op(args, len, rsqrt);
@@ -990,7 +1003,7 @@ int op_Square(const void* args, size_t len)
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
-#if 1 //ndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
   r = unary_op(args, len, square<float, float>);
 #else
   r = unary_op(args, len, square);
