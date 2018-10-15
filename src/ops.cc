@@ -505,7 +505,7 @@ int op_Snapshot(const void* arg, size_t len)
 //
 // Neg
 //
-#if 1//ndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
 namespace {
 template<typename Tin, typename Tout>
   void neg(uint64_t out, uint64_t in, size_t nelems)
@@ -544,7 +544,7 @@ int op_Neg(const void* args, size_t len)
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
-#if 1//ndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
     neg<float, float>(p->out.addr, p->in.addr, p->in.nelems);
 #else
     neg(p->out.addr, p->in.addr, p->in.nelems);
@@ -665,6 +665,7 @@ int op_Floor(const void* args, size_t len)
 //
 // Transpose
 //
+#ifndef LIBVETF_INTRINSIC
 
 namespace {
 template<typename Tin, typename Tout = Tin>
@@ -723,6 +724,7 @@ template<typename Tin, typename Tout = Tin>
     return 0;
   }
 }
+#endif
 
 int op_Transpose(const void* args, size_t len)
 {
@@ -748,14 +750,38 @@ int op_Transpose(const void* args, size_t len)
     << ")";
 
   int ret = 1;
+#ifdef SET_TIMER
+  unsigned long long start = __veperf_get_stm();
+#endif
+
   if (p->dtype == DT_FLOAT) {
     if (p->size == 4) {
       if (p->perm[0] == 0 && p->perm[1] == 2 
           && p->perm[2] == 3 && p->perm[3] == 1) {
+#ifndef LIBVETF_INTRINSIC
         ret = transpose4_0231<float>(p->out, p->in, p->dim_size);
+#else
+        ret = transpose4_0231(p->out, p->in, p->dim_size);
+#endif
+
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("transpose231, len %d %d %d %d:%lfms\n",p->dim_size[0],p->dim_size[1],p->dim_size[2],p->dim_size[3],(end-start)/(800e3));
+#endif
+
       } else if (p->perm[0] == 0 && p->perm[1] == 3 
                  && p->perm[2] == 1 && p->perm[3] == 2) {
+#ifndef LIBVETF_INTRINSIC
         ret = transpose4_0312<float>(p->out, p->in, p->dim_size);
+#else
+        ret = transpose4_0312(p->out, p->in, p->dim_size);
+#endif
+
+#ifdef SET_TIMER
+  unsigned long long end = __veperf_get_stm();
+  printf("transpose312, len %d %d %d %d:%lfms\n",p->dim_size[0],p->dim_size[1],p->dim_size[2],p->dim_size[3],(end-start)/(800e3));
+#endif
+
       }
     }
   }
