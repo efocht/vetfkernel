@@ -24,7 +24,6 @@ add_library(vetfkernel STATIC
 
 target_compile_options(vetfkernel PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
 
-target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH})
+target_include_directories(vetfkernel PUBLIC ${VEDNN_PATH}/include )
 target_include_directories(vetfkernel PRIVATE /opt/nec/ve/nlc/1.0.0/include ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/intrinsic)
 
-target_link_libraries(vetfkernel ${vednn})
