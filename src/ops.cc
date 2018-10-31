@@ -50,6 +50,7 @@ REGISTER_KERNEL("Snapshot", "op_Snapshot")
 REGISTER_KERNEL("Sum", "op_Sum");
 REGISTER_KERNEL("Transpose", "op_Transpose");
 REGISTER_KERNEL("MatMul", "op_MatMul");
+REGISTER_KERNEL("Softmax", "op_Softmax");
 
 // Unary
 REGISTER_KERNEL("Neg", "op_Neg");
@@ -77,6 +78,7 @@ extern "C" {
   int op_Floor(const void* arg, size_t len);
   int op_Transpose(const void* arg, size_t len);
   int op_MatMul(const void* arg, size_t len);
+  int op_Softmax(const void* arg, size_t len);
   int op_Sqrt(const void* arg, size_t len);
   int op_Rsqrt(const void* arg, size_t len);
   int op_Square(const void* arg, size_t len);
@@ -912,6 +914,81 @@ int op_MatMul(const void* args, size_t len)
 
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
   return ret;
+}
+
+//
+// Softmax
+//
+
+int op_Softmax(const void* args, size_t len)
+{
+  struct Args {
+    int dtype;
+    int bool_log;
+    uint64_t in;
+    uint64_t out;
+    uint64_t batch_size;
+    uint64_t num_classes;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->dtype == DT_FLOAT) {
+    const float* in = reinterpret_cast<const float*>(p->in);
+    float* out = reinterpret_cast<float*>(p->out);
+
+// [todo] use vednn
+    if( p->bool_log ) {
+      // LogSoftmax
+      for(uint64_t b=0; b<p->batch_size; b++) {
+        float max = -FLT_MAX ;
+        for(uint64_t i=0; i<p->num_classes; i++) {
+           if( max < in[i] ) max = in[i] ;
+        }
+
+        float sum = 0.f ;
+        for(uint64_t i=0; i<p->num_classes; i++) {
+          const float shifted_in = in[i] - max ; 
+          sum += expf(shifted_in) ;
+          out[i] = shifted_in ;
+        }
+
+        float log_sum = logf(sum) ;
+        for(uint64_t i=0; i<p->num_classes; i++) {
+          out[i] -= log_sum ;
+        }
+
+        in  += p->num_classes ; 
+        out += p->num_classes ; 
+      }
+    }
+    else {
+      // Softmax
+      for(uint64_t b=0; b<p->batch_size; b++) {
+        float max = -FLT_MAX ;
+        for(uint64_t i=0; i<p->num_classes; i++) {
+          if( max < in[i] ) max = in[i] ;
+        }
+
+        float sum = 0.f ;
+        for(uint64_t i=0; i<p->num_classes; i++) {
+          sum += (out[i] = expf(in[i]-max)) ;
+        }
+
+        float inv_sum = 1.f / sum ;
+#pragma _NEC novector  // compiler bug ??
+        for(uint64_t i=0; i<p->num_classes; i++) {
+          out[i] *= inv_sum ;
+        }
+
+        in  += p->num_classes ; 
+        out += p->num_classes ; 
+      }
+    }
+  }
+  
+  return 1;
 }
 
 namespace {
