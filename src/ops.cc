@@ -51,6 +51,7 @@ REGISTER_KERNEL("Sum", "op_Sum");
 REGISTER_KERNEL("Transpose", "op_Transpose");
 REGISTER_KERNEL("MatMul", "op_MatMul");
 REGISTER_KERNEL("Softmax", "op_Softmax");
+REGISTER_KERNEL("Pack", "op_Pack");
 
 // Unary
 REGISTER_KERNEL("Neg", "op_Neg");
@@ -82,6 +83,7 @@ extern "C" {
   int op_Sqrt(const void* arg, size_t len);
   int op_Rsqrt(const void* arg, size_t len);
   int op_Square(const void* arg, size_t len);
+  int op_Pack(const void* arg, size_t len);
 }
 
 namespace {
@@ -922,6 +924,10 @@ int op_MatMul(const void* args, size_t len)
 
 int op_Softmax(const void* args, size_t len)
 {
+  LOG(2) << __FUNCTION__ << " begin";
+
+  int ret = 1 ;
+
   struct Args {
     int dtype;
     int bool_log;
@@ -986,10 +992,59 @@ int op_Softmax(const void* args, size_t len)
         out += p->num_classes ; 
       }
     }
-    return 0;
+    ret = 0 ;
   }
   
-  return 1;
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret;
+}
+
+//
+// Pack
+//
+
+template<typename T>
+  int pack(uint64_t n, uint64_t l, uint64_t *in, uint64_t out)
+  {
+    const T** pi = reinterpret_cast<const T**>(in);
+    T* po = reinterpret_cast<T*>(out);
+
+    for(int64_t i=0; i<n; i++) {
+      for(int64_t j=0; j<l; j++) {
+        po[j] = pi[i][j] ;
+      }
+      po += l ;
+    }
+
+    return 0 ;
+  }
+
+int op_Pack(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  int ret=1;
+
+  struct Args {
+    int dtype;
+    uint64_t n;
+    uint64_t l;
+    uint64_t out;
+    uint64_t in[1] ;
+  } const* p;
+
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->dtype == DT_FLOAT) {
+    ret = pack<float>(p->n, p->l, (uint64_t*)&p->in[0], p->out) ;
+  }
+  else if (p->dtype == DT_INT32) {
+    ret = pack<int32_t>(p->n, p->l, (uint64_t*)&p->in[0], p->out) ;
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+
+  return ret;
 }
 
 namespace {
