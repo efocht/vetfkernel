@@ -986,6 +986,7 @@ int op_Softmax(const void* args, size_t len)
         out += p->num_classes ; 
       }
     }
+    return 0;
   }
   
   return 1;
