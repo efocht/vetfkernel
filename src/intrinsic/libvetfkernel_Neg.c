@@ -24,12 +24,11 @@ void neg(uint64_t out, uint64_t in, size_t n)
 
 
 		if((alignIn==0)&&(alignOut==0)&&(n%2==0)){
-			__vr vr_zero = _ve_vbrdu_vs_f32(0.f);
 			for (size_t i = 0; i < n; i+=2*VLEN) {
 				const int64_t vlen = (n-i < 2*VLEN ? n-i : 2*VLEN) >> 1;
 				_ve_lvl(vlen);
 				__vr vr_pin = _ve_vld_vss(8,pi+i);
-				__vr vr_sub = _ve_pvfsub_vvv(vr_zero, vr_pin);
+				__vr vr_sub = _ve_pvfsub_vsv(0UL, vr_pin);
 				_ve_vst_vss(vr_sub,8,po+i);
 			}
 		}else{
