@@ -23,6 +23,7 @@ int mul_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 		const uint64_t alignIn = ((const uint64_t)in0) & 0x07;
 		const uint64_t alignOut = ((const uint64_t)out) & 0x07;
 		if((alignIn==0)&&(alignOut==0)&&(n%2==0)){
+			_ve_lvl(VLEN);
 			unsigned long int li1 = _ve_pack_f32a(&i1);
 			if(n%(8*VLEN)==0){
 				_ve_lvl(VLEN);
