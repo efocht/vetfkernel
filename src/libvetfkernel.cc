@@ -85,6 +85,7 @@ int vetfkl_entry(const void* arg, size_t len)
 #endif
     if (ret != 0)
       return ret;
+  }
 #if 0
   fprintf(stderr, "vetfkl_entry: end\n");
 #endif
