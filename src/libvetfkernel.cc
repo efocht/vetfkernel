@@ -119,7 +119,7 @@ int vetfkl_get_timestamp(void* arg, size_t len)
     double resolution;
   }* p = reinterpret_cast<tmp*>(arg);
 
-  fprintf(stderr, "vetfkl_get_timestamp: len=%lu sizeof(tmp)=%lu\n", len, sizeof(tmp));
+  //fprintf(stderr, "vetfkl_get_timestamp: len=%lu sizeof(tmp)=%lu\n", len, sizeof(tmp));
 
   if (len < sizeof(tmp))
     return 1;
@@ -127,7 +127,7 @@ int vetfkl_get_timestamp(void* arg, size_t len)
   p->ts = get_timestamp();
   p->resolution = get_resolution();
 
-  fprintf(stderr, "vetfkl_get_timestamp: resolution=%lf\n", p->resolution);
+  //fprintf(stderr, "vetfkl_get_timestamp: resolution=%lf\n", p->resolution);
 
   return 0;
 
