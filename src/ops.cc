@@ -611,6 +611,11 @@ int op_Sum(const void* args, size_t len)
       ret = reduction_d2a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
     }
   }
+  else if (p->dtype == DT_DOUBLE) {
+    if (p->ndims == 2 && p->axis == 1) {
+      ret = reduction_d2a1<double>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+    }
+  }
 
 
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
