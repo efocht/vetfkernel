@@ -20,6 +20,7 @@ add_library(vetfkernel STATIC
         ops.cc
         ve_ops.cc
         binary_ops.cc
+        reduction_ops.cc
         $<TARGET_OBJECTS:vetfkernel_intrinsic>)
 
 target_compile_options(vetfkernel PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
