@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-set(CMAKE_C_COMPILER /proj/share/local/x86_64/llvm/bin/clang)
+set(CMAKE_C_COMPILER ${LLVM_INSTALL_PREFIX}/bin/clang)
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target ve -O3 -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics")
 
 add_library(vetfkernel_intrinsic OBJECT
