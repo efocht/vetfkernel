@@ -4,6 +4,7 @@
 #include <string>
 
 #include "kernel.h"
+#include "log.h"
 
 #define MAX_KERNEL 1024
 
@@ -39,7 +40,10 @@ uint64_t get_kernel_table_addr()
 void register_kernel(char const* name, char const* func)
 {
     // FIXME: check MAX_KERNEL
-    fprintf(stderr, "libvetfkernel::register_kernel: kernel_index=%d name=%s func=%s\n", kernel_index, name, func);
+  LOG(1) << __FUNCTION__ << ":"
+    << " kernel_index=" << kernel_index
+    << " kernel_name=" << name
+    << " func=" << func;
     Kernel& k = table_[kernel_index++];
 
     strcpy(k.name, name);

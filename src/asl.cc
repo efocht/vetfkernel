@@ -2,7 +2,7 @@
 #include "log.h"
 
 static void asl_init() {
-  fprintf(stderr, "%s\n", __FUNCTION__);
+  LOG(1) << __FUNCTION__;
   if (asl_library_initialize() != ASL_ERROR_OK) {
     fprintf(stderr, "asl_library_initialize failed\n");
     exit(1);
