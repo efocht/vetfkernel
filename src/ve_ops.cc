@@ -6,6 +6,14 @@
 
 #include <asl.h>
 
+#define DEFINE_KERNEL(NAME, FUNC) \
+  REGISTER_KERNEL(#NAME, "op_" # NAME); \
+  extern "C" { \
+    int op_##NAME(const void* args, size_t len) { \
+      return op_Kernel(args, len, FUNC, "op_" # NAME); \
+    } \
+  }
+
 REGISTER_KERNEL("Select", "op_Select");
 REGISTER_KERNEL("RandomUniform", "op_RandomUniform");
 REGISTER_KERNEL("Assign", "op_Assign");
@@ -34,7 +42,14 @@ struct Tensor {
     s << "[dtype=" << dtype
       << ",dims=" << dims
       << ",nelems=" << nelems
-      << "]";
+      << ",dim_size=[";
+
+    for (size_t i = 0; i < dims; ++i) {
+      s << dim_size[i];
+      if (i < dims - 1)
+        s << ",";
+    }
+    s << "]]";
     return s.str();
   }
 } __attribute__((__packed__));
@@ -323,3 +338,93 @@ int op_Assign(const void* args, size_t len)
 {
   return op_Kernel(args, len, op_assign, "op_Assign");
 }
+
+//
+// Cast
+//
+
+namespace {
+
+template <typename TO, typename TI>
+  void cast(const Tensor* to, const Tensor* ti) {
+    TO* po = reinterpret_cast<TO*>(to->addr);
+    const TI* pi = reinterpret_cast<const TI*>(ti->addr);
+
+    for (size_t i = 0; i < ti->nelems; ++i)
+      po[i] = pi[i];
+  }
+
+int op_cast(const VEOpArgs& args)
+{
+  if (args.nTensors() != 2)
+    return 1;
+  const Tensor* ti = args.tensor(0);
+  const Tensor* to = args.tensor(1);
+
+  LOG(3) << __FUNCTION__ << " ti=" << ti << " to=" << to;
+
+  if (!ti || !to)
+    return 1;
+
+  LOG(3) << __FUNCTION__ << " ti=" << ti->to_s() << " to=" << to->to_s();
+
+  if (ti->nelems != to->nelems)
+    return 1;
+
+  if (ti->dtype == DT_BOOL && to->dtype == DT_FLOAT) {
+    cast<float, bool>(to, ti);
+  } else if (ti->dtype == DT_INT32 && to->dtype == DT_FLOAT) {
+    cast<float, int32_t>(to, ti);
+  } else {
+    return 1;
+  }
+
+  return 0;
+}
+
+} // namespace
+
+DEFINE_KERNEL(Cast, op_cast);
+
+//
+// Tile
+//
+
+namespace {
+int op_tile(const VEOpArgs& args)
+{
+  if (args.nTensors() != 2)
+    return 1;
+  const Tensor* ti = args.tensor(0);
+  const Tensor* to = args.tensor(1);
+
+  LOG(3) << __FUNCTION__ 
+    << " ti=" << ti->to_s()
+    << " to=" << to->to_s();
+
+  if (ti->dtype == DT_FLOAT && to->dtype == DT_FLOAT) {
+    const float* pi = reinterpret_cast<const float*>(ti->addr);
+    float* po = reinterpret_cast<float*>(to->addr);
+    if (ti->dims == 1 && to->dims == 1 && ti->nelems == 1) {
+      for (size_t i = 0; i < to->nelems; ++i) {
+        po[i] = pi[0];
+      }
+    } else if (ti->dims == 2 && to->dims == 2
+               && ti->dim_size[0] == to->dim_size[0]
+               && ti->dim_size[1] == 1) {
+      for (size_t i = 0; i < ti->dim_size[0]; ++i) {
+        for (size_t j = 0; j < to->dim_size[1]; ++j) {
+          po[i * to->dim_size[1] + j] = pi[i];
+        }
+      }
+    } else 
+      return 1;
+  } else {
+    return 1;
+  }
+
+  return 0;
+}
+} // namespace
+
+DEFINE_KERNEL(Tile, op_tile);

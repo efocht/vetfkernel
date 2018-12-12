@@ -12,8 +12,8 @@ extern "C" {
     int get_num_kernels();
     uint64_t get_kernel_table_addr();
 
-    int vetfkl_entry(const void* arg, size_t len);
-    int vetfkl_entry_prof(const void* argIn, size_t lenIn, void* argOut, size_t lenOut);
+    uint64_t vetfkl_entry(const void* arg, size_t len);
+    uint64_t vetfkl_entry_prof(const void* argIn, size_t lenIn, void* argOut, size_t lenOut);
     int vetfkl_get_timestamp(void* arg, size_t len);
 
     int op_Assign(const void* arg, size_t len);
@@ -50,7 +50,7 @@ void register_kernel(char const* name, char const* func)
     strcpy(k.func, func);
 }
 
-int vetfkl_entry(const void* arg, size_t len)
+uint64_t vetfkl_entry(const void* arg, size_t len)
 {
 #if 0
   fprintf(stderr, "vetfkl_entry: len=%lu\n", len);
@@ -87,8 +87,10 @@ int vetfkl_entry(const void* arg, size_t len)
 #if 0
     fprintf(stderr, "vetfkl_entry: ret=%d\n", ret);
 #endif
-    if (ret != 0)
-      return ret;
+    if (ret != 0) {
+      uint64_t retval = ((uint64_t)i) << 32 | ret;
+      return retval;
+    }
   }
 #if 0
   fprintf(stderr, "vetfkl_entry: end\n");
@@ -149,7 +151,8 @@ int vetfkl_get_timestamp(void* arg, size_t len)
 #endif
 }
 
-int vetfkl_entry_prof(const void* argIn, size_t lenIn, void* argOut, size_t lenOut)
+uint64_t vetfkl_entry_prof(const void* argIn, size_t lenIn, 
+                           void* argOut, size_t lenOut)
 {
 #if 0
   fprintf(stderr, "vetfkl_entry_prof: argIn=%p lenIn=%lu argOut=%p lenOut=%lu\n",
@@ -170,8 +173,7 @@ int vetfkl_entry_prof(const void* argIn, size_t lenIn, void* argOut, size_t lenO
 
   uint64_t* pcyc = nullptr;
   if (lenOut > 0) {
-    *reinterpret_cast<double*>(argOut) = 1.4*1e9;
-    pcyc = reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(argOut) + sizeof(double));
+    pcyc = reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(argOut));
   }
 
   for (int i = 0; i < num_kernels; ++i) {
@@ -198,8 +200,10 @@ int vetfkl_entry_prof(const void* argIn, size_t lenIn, void* argOut, size_t lenO
 #if 0
     fprintf(stderr, "vetfkl_entry: ret=%d\n", ret);
 #endif
-    if (ret != 0)
-      return ret;
+    if (ret != 0) {
+      uint64_t retval = ((uint64_t)i) << 32 | ret;
+      return retval;
+    }
   }
 
 #if 0
