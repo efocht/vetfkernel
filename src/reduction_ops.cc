@@ -11,6 +11,7 @@
 
 REGISTER_KERNEL("Sum", "op_Sum");
 REGISTER_KERNEL("Prod", "op_Prod");
+REGISTER_KERNEL("Mean", "op_Mean");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -21,6 +22,7 @@ REGISTER_KERNEL("Prod", "op_Prod");
 extern "C" {
   int op_Sum(const void* arg, size_t len);
   int op_Prod(const void* arg, size_t len);
+  int op_Mean(const void* arg, size_t len);
 }
 
 
@@ -309,4 +311,62 @@ int op_Prod(const void* args, size_t len)
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
   return ret;
 }
+
+//
+// Mean
+//
+
+namespace {
+template <typename T>
+int mean_d2a1(uint64_t out, uint64_t in, size_t dim0, size_t dim1)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi = reinterpret_cast<const T*>(in);
+
+  for (size_t i = 0; i < dim0; ++i) {
+    T s = T(0);
+    for (size_t j = 0; j < dim1; ++j) {
+      s += pi[i * dim1 + j];
+    }
+    po[i] = s / dim1;
+  }
+
+  return 0;
+}
+} // namespace
+
+
+int op_Mean(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct Args {
+    int dtype;
+    int ndims;
+    uint64_t in;
+    uint64_t out;
+    int64_t dim_size[3];
+    int axis;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  int ret = 1;
+
+  LOG(3) << __FUNCTION__
+    << ": dtype=" << p->dtype
+    << " ndims=" << p->ndims
+    << " axis=" << p->axis;
+
+  if (p->dtype == DT_FLOAT) {
+    if (p->ndims == 2 && p->axis == 1) {
+      ret = mean_d2a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret;
+}
+
 
