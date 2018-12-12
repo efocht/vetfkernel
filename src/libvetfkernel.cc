@@ -173,8 +173,7 @@ uint64_t vetfkl_entry_prof(const void* argIn, size_t lenIn,
 
   uint64_t* pcyc = nullptr;
   if (lenOut > 0) {
-    *reinterpret_cast<double*>(argOut) = 1.4*1e9;
-    pcyc = reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(argOut) + sizeof(double));
+    pcyc = reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(argOut));
   }
 
   for (int i = 0; i < num_kernels; ++i) {
