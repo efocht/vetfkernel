@@ -417,7 +417,8 @@ int op_tile(const VEOpArgs& args)
           po[i * to->dim_size[1] + j] = pi[i];
         }
       }
-    }
+    } else 
+      return 1;
   } else {
     return 1;
   }
