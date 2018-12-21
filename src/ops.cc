@@ -52,6 +52,7 @@ REGISTER_KERNEL("MatMul", "op_MatMul");
 REGISTER_KERNEL("Softmax", "op_Softmax");
 REGISTER_KERNEL("Pack", "op_Pack");
 REGISTER_KERNEL("Concat", "op_Concat");
+REGISTER_KERNEL("Slice", "op_Slice");
 
 // Unary
 REGISTER_KERNEL("Neg", "op_Neg");
@@ -88,6 +89,7 @@ extern "C" {
   int op_Reciprocal(const void* arg, size_t len);
   int op_Log(const void* arg, size_t len);
   int op_Concat(const void* arg, size_t len);
+  int op_Slice(const void* arg, size_t len);
 }
 
 namespace {
@@ -1157,6 +1159,104 @@ int op_Concat(const void* args, size_t len)
 
   return ret;
 }
+
+//
+// Slice
+//
+template <typename T>
+int slice1(uint64_t input_ptr, uint64_t output_ptr,
+           uint64_t input_size, uint64_t output_size, uint64_t index) 
+{
+  const T* pi = reinterpret_cast<const T*>(input_ptr);
+  T* po = reinterpret_cast<T*>(output_ptr);
+
+  const T* pi_ = pi + index ;
+  for(int i=0; i1<output_size; i++) {
+    po[i] = pi_[i] ;
+  }
+
+  return 0 ;
+} 
+
+template <typename T>
+int slice2(uint64_t input_ptr, uint64_t output_ptr,
+           uint64_t *input_size, uint64_t *output_size, uint64_t *index) 
+{
+  const T* pi = reinterpret_cast<const T*>(input_ptr);
+  T* po = reinterpret_cast<T*>(output_ptr);
+
+  for(int i0=0; i0<output_size[0]; i0++) {
+    const T* pi_ = pi + (i0+index[0])*input_size[1] + index[1] ;
+    for(int i1=0; i1<output_size[1]; i1++) {
+      po[i1] = pi_[i1] ;
+    }
+    po += output_size[1] ;
+  }
+
+  return 0 ;
+} 
+
+template <typename T>
+int slice_handle(uint64_t input_dims, uint64_t input_ptr, uint64_t output_ptr, uint64_t *array) 
+{
+  int ret=1 ;
+
+  switch( input_dims ) {
+  case 1 :
+    //ret = slice1<T>(input_ptr, output_ptr, array[0], array[1], array[2]) ;
+    break ;
+  case 2 :
+    ret = slice2<T>(input_ptr, output_ptr, array, array+2, array+4) ;
+    break ;
+#if 0 // todo : add larger dim
+  case 3 :
+    break ;
+  case 4 :
+    break ;
+  case 5 :
+    break ;
+  case 6 :
+    break ;
+  case 7 :
+    break ;
+#endif
+  default :
+    break ;
+  }
+  return ret ;
+}
+//
+int op_Slice(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  int ret=1;
+
+  struct Args {
+    int dtype;
+    uint64_t input_dims;
+    uint64_t input_ptr ;
+    uint64_t output_ptr ;
+    uint64_t array[1] ;
+  } const* p;
+
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->dtype == DT_FLOAT) {
+    ret = slice_handle<float>(p->input_dims, p->input_ptr, p->output_ptr, (uint64_t*) p->array) ;
+  }
+  else if (p->dtype == DT_INT32) {
+    ret = slice_handle<int32_t>(p->input_dims, p->input_ptr, p->output_ptr, (uint64_t*) p->array) ;
+  }
+  else if (p->dtype == DT_DOUBLE) {
+    ret = slice_handle<double>(p->input_dims, p->input_ptr, p->output_ptr, (uint64_t*) p->array) ;
+  }
+  
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret ; 
+}
+
 
 namespace {
 
