@@ -23,6 +23,7 @@ add_library(vetfkernel STATIC
   reduction_ops.cc
   training_ops.cc
   dense_update_functor.cc
+  gather_functor.cc
   $<TARGET_OBJECTS:vetfkernel_intrinsic>)
 
 target_compile_options(vetfkernel PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
