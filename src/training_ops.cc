@@ -40,7 +40,7 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
   T* m   = reinterpret_cast<T*>(m_ptr);
   T* v   = reinterpret_cast<T*>(v_ptr);
 
-  const T* grd = reinterpret_cast<const T*>(grd);
+  const T* grd = reinterpret_cast<const T*>(grd_ptr);
 
   const T beta1_power = reinterpret_cast<const T*>(beta1_power_ptr)[0];
   const T beta2_power = reinterpret_cast<const T*>(beta2_power_ptr)[0];
