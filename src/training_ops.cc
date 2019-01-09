@@ -57,11 +57,14 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
   for(int64_t i=0; i<num_elements; i++) {
     v[i] = v[i] + (one - beta2) * (grd[i]*grd[i] - v[i]) ;
   }
+  
+  const T k = (lr * std::sqrt( one - beta2_power) / ( one - beta1_power)) ;
   if( use_nesterov ) {
-
+    for(int64_t i=0; i<num_elements; i++) {
+      var[i] -= k * ( m[i] * beta1 + (one-beta1) * grd[i] ) / ( epsilon + std::sqrt(v[i])) ;
+    }
   }
   else {
-    const T k = (lr * ( one - beta2_power) * (one - beta2_power)  / ( one - beta1_power)) ;
     for(int64_t i=0; i<num_elements; i++) {
       var[i] -= k * m[i] / (epsilon + std::sqrt(v[i])) ;
     }
