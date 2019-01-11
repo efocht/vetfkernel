@@ -360,7 +360,19 @@ int op_lessEqual(const BinaryOpArgs& args) {
 }
 
 // Div
-#ifndef LIBVETF_INTRINSIC
+
+template <typename T>
+int div_1n(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  T i0 = *reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < nelems; ++i) {
+    po[i] = i0 / pi1[i];
+  }
+  return 0;
+}
 
 template <typename T>
 int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
@@ -369,12 +381,15 @@ int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   const T* pi0 = reinterpret_cast<const T*>(in0);
   T i1 = *reinterpret_cast<const T*>(in1);
 
+      printf("i1 = %lf\n", i1) ;
+      printf("nelems = %d\n", nelems) ;
   for (size_t i = 0; i < nelems; ++i) {
     po[i] = pi0[i] / i1;
   }
   return 0;
 }
 
+#ifndef LIBVETF_INTRINSIC
 // nelems_in0 > nelems_in1
 template <typename T>
 int div2_nn_n1(uint64_t out, 
@@ -406,13 +421,9 @@ int r=0;
 #endif
 
     if (args.in0.nelems == 1) {
-#ifndef LIBVETF_INTRINSIC
-      r = div_n1<float>(args.out.addr, args.in1.addr, args.in0.addr,
-                           args.out.nelems);
-#else
-      r = div_n1(args.out.addr, args.in1.addr, args.in0.addr,
-                           args.out.nelems);
-#endif
+      /* TODO : impl intrinsic */
+      r = div_1n<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                        args.out.nelems);
 
 #ifdef SET_TIMER
       unsigned long long end = __veperf_get_stm();
@@ -420,7 +431,8 @@ int r=0;
 #endif
 
     } else if (args.in1.nelems == 1) {
-#ifndef LIBVETF_INTRINSIC
+      /* FIXME : modify a bug in intrinsic version */
+#if 1 //ifndef LIBVETF_INTRINSIC
       r = div_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
 #else
