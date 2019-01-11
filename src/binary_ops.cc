@@ -437,6 +437,7 @@ int div_1n(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
+#ifndef LIBVETF_INTRINSIC
 template <typename T>
 int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 {
@@ -450,7 +451,6 @@ int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
-#ifndef LIBVETF_INTRINSIC
 // nelems_in0 > nelems_in1
 template <typename T>
 int div2_nn_n1(uint64_t out, 
@@ -493,7 +493,7 @@ int op_div(const BinaryOpArgs& args) {
 
     } else if (args.in1.nelems == 1) {
       /* FIXME : modify a bug in intrinsic version */
-#if 1 //ifndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
       r = div_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
 #else
