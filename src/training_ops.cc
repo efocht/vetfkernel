@@ -51,6 +51,38 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
 
   const T one = T(1.) ; 
 
+#if 1 // optimized
+ 
+ 
+  const T k = (lr * std::sqrt( one - beta2_power) / ( one - beta1_power)) ;
+
+#pragma omp parallel
+  { 
+    int64_t nthreads = omp_get_num_threads() ;
+    int64_t threadid = omp_get_thread_num() ;
+
+    int64_t eachNElement = num_elements / nthreads ;
+    int64_t remain       = num_elements % nthreads ;
+
+    int64_t elementBegin = eachNElement * threadid + ( threadid < remain ? threadid : remain ) ;
+    int64_t myElement    = eachNElement + ( threadid < remain ? 1 : 0 ) ;
+
+    if( use_nesterov ) {
+      for(int64_t i=elementBegin; i<myElement; i++) {
+        m[i] = m[i] + (one - beta1) * (grd[i] - m[i]) ;
+        v[i] = v[i] + (one - beta2) * (grd[i]*grd[i] - v[i]) ;
+        var[i] -= k * ( m[i] * beta1 + (one-beta1) * grd[i] ) / ( epsilon + std::sqrt(v[i])) ;
+      }
+    }
+    else {
+      for(int64_t i=elementBegin; i<myElement; i++) {
+        m[i] = m[i] + (one - beta1) * (grd[i] - m[i]) ;
+        v[i] = v[i] + (one - beta2) * (grd[i]*grd[i] - v[i]) ;
+        var[i] -= k * m[i] / (epsilon + std::sqrt(v[i])) ;
+      }
+    }
+  }
+#else // original
   for(int64_t i=0; i<num_elements; i++) {
     m[i] = m[i] + (one - beta1) * (grd[i] - m[i]) ;
   }
@@ -69,6 +101,7 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
       var[i] -= k * m[i] / (epsilon + std::sqrt(v[i])) ;
     }
   }
+#endif
 
   return 0 ;
 }
