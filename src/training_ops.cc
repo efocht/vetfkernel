@@ -68,14 +68,14 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
     int64_t myElement    = eachNElement + ( threadid < remain ? 1 : 0 ) ;
 
     if( use_nesterov ) {
-      for(int64_t i=elementBegin; i<myElement; i++) {
+      for(int64_t i=elementBegin; i<elementBegin+myElement; i++) {
         m[i] = m[i] + (one - beta1) * (grd[i] - m[i]) ;
         v[i] = v[i] + (one - beta2) * (grd[i]*grd[i] - v[i]) ;
         var[i] -= k * ( m[i] * beta1 + (one-beta1) * grd[i] ) / ( epsilon + std::sqrt(v[i])) ;
       }
     }
     else {
-      for(int64_t i=elementBegin; i<myElement; i++) {
+      for(int64_t i=elementBegin; i<elementBegin+myElement; i++) {
         m[i] = m[i] + (one - beta1) * (grd[i] - m[i]) ;
         v[i] = v[i] + (one - beta2) * (grd[i]*grd[i] - v[i]) ;
         var[i] -= k * m[i] / (epsilon + std::sqrt(v[i])) ;
