@@ -146,7 +146,7 @@ int add_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 int op_add(const BinaryOpArgs& args) {
   if (CheckTypesAll(args, DT_FLOAT)) {
 
-int r=0;
+    int r=1;
 
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
@@ -200,6 +200,32 @@ int r=0;
 
 // Sub
 
+template <typename T>
+int sub_1n(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  T i0 = *reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < nelems; ++i) {
+    po[i] = i0 - pi1[i];
+  }
+  return 0;
+}
+
+template <typename T>
+int sub_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < nelems; ++i) {
+    po[i] = pi0[i] - i1;
+  }
+  return 0;
+}
+
 #ifndef LIBVETF_INTRINSIC
 template <typename T>
 int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
@@ -217,8 +243,16 @@ int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 
 int op_sub(const BinaryOpArgs& args) {
   if (CheckTypesAll(args, DT_FLOAT)) {
-    int r=0;
-    if (args.in0.nelems == args.in1.nelems) {
+    int r=1;
+    if (args.in0.nelems == 1) {
+      r = sub_1n<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                        args.out.nelems);
+    }
+    else if(args.in1.nelems == 1) {
+      r = sub_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                        args.out.nelems);
+    }
+    else if (args.in0.nelems == args.in1.nelems) {
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
@@ -281,7 +315,7 @@ int op_mul(const BinaryOpArgs& args) {
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
 #endif
-    int r=0;
+    int r=1;
 
 
     if (args.in0.nelems == 1) {
@@ -381,8 +415,6 @@ int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   const T* pi0 = reinterpret_cast<const T*>(in0);
   T i1 = *reinterpret_cast<const T*>(in1);
 
-      printf("i1 = %lf\n", i1) ;
-      printf("nelems = %d\n", nelems) ;
   for (size_t i = 0; i < nelems; ++i) {
     po[i] = pi0[i] / i1;
   }
@@ -414,7 +446,7 @@ int div2_nn_n1(uint64_t out,
 int op_div(const BinaryOpArgs& args) {
   if (CheckTypesAll(args, DT_FLOAT)) {
 
-int r=0;
+    int r=1;
 
 #ifdef SET_TIMER
   unsigned long long start = __veperf_get_stm();
