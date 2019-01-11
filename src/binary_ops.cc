@@ -466,7 +466,7 @@ int op_div(const BinaryOpArgs& args) {
 
     } else if (args.in1.nelems == 1) {
       /* FIXME : modify a bug in intrinsic version */
-#if 1 //ifndef LIBVETF_INTRINSIC
+#ifndef LIBVETF_INTRINSIC
       r = div_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
 #else
