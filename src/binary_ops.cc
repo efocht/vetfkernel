@@ -243,6 +243,25 @@ int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 }
 #endif
 
+template <typename T>
+int sub2_nn_n1(uint64_t out, 
+               uint64_t in0,
+               uint64_t in1, 
+               size_t n0,
+               size_t n1)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n0; ++i) {
+    for (size_t j = 0; j < n1; ++j) {
+      po[i * n1 + j] = pi0[i * n1 + j] - pi1[i];
+    }
+  }
+  return 0;
+}
+
 int op_sub(const BinaryOpArgs& args) {
   if (CheckTypesAll(args, DT_FLOAT)) {
     int r=1;
@@ -271,8 +290,16 @@ int op_sub(const BinaryOpArgs& args) {
       unsigned long long end = __veperf_get_stm();
       printf("sub nn: %d, 		%lf ms\n",args.in0.nelems,(end-start)/(800e3));
 #endif
-
-
+    }
+    else if (args.in0.dims == 2
+               && args.in1.dims == 2
+               && args.in0.dim_size[0] == args.in1.dim_size[0]
+               && args.in1.dim_size[1] == 1) {
+      r = sub2_nn_n1<float>(args.out.addr,
+                               args.in0.addr,
+                               args.in1.addr,
+                               args.in0.dim_size[0],
+                               args.in0.dim_size[1]);
     }
     return r;
   }
