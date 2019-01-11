@@ -31,6 +31,7 @@ REGISTER_KERNEL("Add", "op_Add");
 REGISTER_KERNEL("Sub", "op_Sub");
 REGISTER_KERNEL("Mul", "op_Mul");
 REGISTER_KERNEL("Div", "op_Div");
+REGISTER_KERNEL("DivNoNan", "op_DivNoNan");
 REGISTER_KERNEL("Minimum", "op_Minimum");
 REGISTER_KERNEL("Maximum", "op_Maximum");
 REGISTER_KERNEL("LessEqual", "op_LessEqual");
@@ -41,6 +42,7 @@ extern "C" {
   int op_Sub(const void* arg, size_t len);
   int op_Mul(const void* arg, size_t len);
   int op_Div(const void* arg, size_t len);
+  int op_DivNoNan(const void* arg, size_t len);
   int op_Minimum(const void* arg, size_t len);
   int op_Maximum(const void* arg, size_t len);
   int op_LessEqual(const void* arg, size_t len);
@@ -505,6 +507,94 @@ int op_div(const BinaryOpArgs& args) {
   return 1;
 }
 
+// DivNoNan
+
+template <typename T>
+int divnonan_1n(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  T i0 = *reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < nelems; ++i) {
+    if( pi1[i] == T(0.) ) po[i] = T(0.) ;
+    else                  po[i] = i0 / pi1[i];
+  }
+  return 0;
+}
+
+template <typename T>
+int divnonan_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  if( i1 == T(0.) ) { 
+    for (size_t i = 0; i < nelems; ++i) {
+      po[i] = T(0.) ;
+    }
+  }
+  else {
+    for (size_t i = 0; i < nelems; ++i) {
+      po[i] = pi0[i] / i1;
+    }
+  }
+  return 0;
+}
+
+template <typename T>
+int divnonan2_nn_n1(uint64_t out, 
+                    uint64_t in0,
+                    uint64_t in1, 
+                    size_t n0,
+                    size_t n1)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n0; ++i) {
+    if( pi1[i] == T(0.) ) {
+      for (size_t j = 0; j < n1; ++j) {
+        po[i * n1 + j] = T(0.) ;
+      }
+    }
+    else { 
+      for (size_t j = 0; j < n1; ++j) {
+        po[i * n1 + j] = pi0[i * n1 + j] / pi1[i];
+      }
+    }
+  }
+  return 0;
+}
+
+int op_divnonan(const BinaryOpArgs& args) {
+  if (CheckTypesAll(args, DT_FLOAT)) {
+
+    int r=1;
+
+    if (args.in0.nelems == 1) {
+      r = divnonan_1n<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                            args.out.nelems);
+    } else if (args.in1.nelems == 1) {
+      r = divnonan_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                             args.out.nelems);
+    } else if (args.in0.dims == 2
+               && args.in1.dims == 2
+               && args.in0.dim_size[0] == args.in1.dim_size[0]
+               && args.in1.dim_size[1] == 1) {
+      r = divnonan2_nn_n1<float>(args.out.addr,
+                               args.in0.addr,
+                               args.in1.addr,
+                               args.in0.dim_size[0],
+                               args.in0.dim_size[1]);
+    }
+    return r;
+  }
+  return 1;
+}
+
 // Minimum
 
 template <typename T>
@@ -600,6 +690,11 @@ int op_Mul(const void* args, size_t len)
 int op_Div(const void* args, size_t len)
 {
   return op_Binary(args, len, op_div, "op_Div");
+}
+
+int op_DivNoNan(const void* args, size_t len)
+{
+  return op_Binary(args, len, op_divnonan, "op_DivNoNan");
 }
 
 int op_Minimum(const void* args, size_t len)
