@@ -410,6 +410,7 @@ int div_1n(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
+#ifndef LIBVETF_INTRINSIC
 template <typename T>
 int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 {
@@ -423,7 +424,6 @@ int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
-#ifndef LIBVETF_INTRINSIC
 // nelems_in0 > nelems_in1
 template <typename T>
 int div2_nn_n1(uint64_t out, 
