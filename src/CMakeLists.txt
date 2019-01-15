@@ -25,6 +25,7 @@ add_library(vetfkernel STATIC
   dense_update_functor.cc
   gather_functor.cc
   segment_reduction_ops.cc
+  sparse_xent_ops.cc
   $<TARGET_OBJECTS:vetfkernel_intrinsic>)
 
 target_compile_options(vetfkernel PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)

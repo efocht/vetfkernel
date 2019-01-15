@@ -41,6 +41,7 @@ static inline unsigned long long __veperf_get_stm() {
 #undef ADD_
 
 REGISTER_KERNEL("Fill", "op_fill");
+REGISTER_KERNEL("ZerosLike", "op_ZerosLike");
 REGISTER_KERNEL("AddN", "op_AddN");
 REGISTER_KERNEL("BiasAdd", "op_BiasAdd");
 REGISTER_KERNEL("BiasAddGrad", "op_BiasAddGrad");
@@ -71,6 +72,7 @@ REGISTER_KERNEL("Log", "op_Log");
 
 extern "C" {
   int op_fill(const void* arg, size_t len);
+  int op_ZerosLike(const void* arg, size_t len);
   int op_AddN(const void* arg, size_t len);
   int op_BiasAdd(const void* arg, size_t len);
   int op_BiasAddGrad(const void* arg, size_t len);
@@ -91,6 +93,10 @@ extern "C" {
   int op_Concat(const void* arg, size_t len);
   int op_Slice(const void* arg, size_t len);
 }
+
+//
+// Fill
+//
 
 namespace {
 template <typename T>
@@ -139,6 +145,56 @@ int op_fill(const void* args, size_t len)
 
   if (dtype == DT_FLOAT) {
     return fill<float>(args, len);
+  } else {
+    return 1;
+  }
+}
+
+//
+// ZerosLike
+//
+
+namespace {
+template <typename T>
+  int zeroslike(const void* args, size_t len)
+  {
+    LOG(2) << __PRETTY_FUNCTION__;
+    struct Args {
+      int data_type;
+      uint64_t out;
+      size_t num_elems;
+    } const* p;
+
+    if (len != sizeof(*p)) {
+      fprintf(stderr, "%s: illegal argument lenght: %ld expected but %ld\n",
+              sizeof(*p), len);
+      return 1;
+    }
+
+    p = reinterpret_cast<const Args*>(args);
+
+    T* out = (T*)p->out;
+
+    LOG(2) << __FUNCTION__ ;
+
+    for (size_t i = 0; i < p->num_elems; ++i)
+      out[i] = T(0.);
+
+    LOG(2) << __PRETTY_FUNCTION__ << ": done";
+    return 0;
+  }
+}
+
+#define DATA_TYPE(p) *(int*)(p)
+
+int op_ZerosLike(const void* args, size_t len)
+{
+  LOG(1) << __FUNCTION__;
+  int dtype = DATA_TYPE(args);
+  LOG(2) << __FUNCTION__ << ": dtype=" << dtype;
+
+  if (dtype == DT_FLOAT) {
+    return zeroslike<float>(args, len);
   } else {
     return 1;
   }

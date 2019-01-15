@@ -35,6 +35,7 @@ int dense_update_assign(int64_t num_elements,
   T* dst = reinterpret_cast<T*>(dst_ptr);
   const T* src = reinterpret_cast<const T*>(src_ptr);
 
+#pragma omp parallel for
   for(int64_t i=0; i<num_elements; i++) {
     dst[i] = src[i] ;
   }
