@@ -39,6 +39,39 @@ int SparseSoftmaxXentWithLogits(int64_t batch_size, int64_t num_classes,
   T* loss = reinterpret_cast<T*>(loss_ptr);
   T* backprop = reinterpret_cast<T*>(backprop_ptr);
 
+#if 1
+  for(int64_t i=0; i<batch_size; i++) {
+    T max_logits = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      if( max_logits < logits[i*num_classes+j]) {
+        max_logits = logits[i*num_classes+j] ;
+      }
+    }
+    for(int64_t j=0; j<num_classes; j++) {
+      backprop[i*num_classes+j] = logits[i*num_classes+j] - max_logits ;
+    }
+ 
+    T sum_exp_logits = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      sum_exp_logits += std::exp(backprop[i*num_classes+j]) ;
+    }
+
+    const T log_sum_exp_logits = std::log(sum_exp_logits) ;
+    const Index label = labels[i] ;
+    T sum = T(0.) ; 
+    for(int64_t j=0; j<num_classes; j++) {
+      sum += ( j == label ? 
+                     log_sum_exp_logits - backprop[i*num_classes+j] :
+                     T(0.) 
+                 ) ;  
+      backprop[i*num_classes+j] = 
+        std::exp(backprop[i*num_classes+j]) / sum_exp_logits
+          - ( j == label ? T(1.) : T(0.) ) ;
+    }
+    loss[i] = sum ;
+
+  }
+#else // original
   // scratch = max_logits along classes.
   for(int64_t i=0; i<batch_size; i++) {
     T max = T(0.) ;
@@ -94,6 +127,7 @@ int SparseSoftmaxXentWithLogits(int64_t batch_size, int64_t num_classes,
           - ( j == label ? T(1.) : T(0.) ) ;
     }
   }
+#endif
 
   return 0 ;
 }

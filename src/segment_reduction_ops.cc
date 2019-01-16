@@ -37,10 +37,12 @@ int unsorted_segment_sum(int64_t num_idx, int64_t num_segments, int64_t segment_
   const Index* idx = reinterpret_cast<const Index*>(idx_ptr);
   T* dst = reinterpret_cast<T*>(dst_ptr);
 
+#pragma omp parallel for
   for(int64_t i=0; i < num_segments * segment_size; i++) {
     dst[i] = initial_value ;
   }
 
+  // TODO : use openmp
   for(int64_t i=0; i<num_idx; i++) {
     const int64_t k = idx[i] ;
     for(int64_t j=0; j<segment_size; j++) {
