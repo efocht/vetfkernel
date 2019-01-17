@@ -21,6 +21,7 @@ add_library(vetfkernel STATIC
   ve_ops.cc
   binary_ops.cc
   reduction_ops.cc
+  argmax.cc
   training_ops.cc
   dense_update_functor.cc
   gather_functor.cc
