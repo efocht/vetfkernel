@@ -35,6 +35,7 @@ REGISTER_KERNEL("DivNoNan", "op_DivNoNan");
 REGISTER_KERNEL("Minimum", "op_Minimum");
 REGISTER_KERNEL("Maximum", "op_Maximum");
 REGISTER_KERNEL("Equal", "op_Equal");
+REGISTER_KERNEL("NotEqual", "op_NotEqual");
 REGISTER_KERNEL("LessEqual", "op_LessEqual");
 REGISTER_KERNEL("GreaterEqual", "op_GreaterEqual");
 
@@ -47,6 +48,7 @@ extern "C" {
   int op_Minimum(const void* arg, size_t len);
   int op_Maximum(const void* arg, size_t len);
   int op_Equal(const void* arg, size_t len);
+  int op_NotEqual(const void* arg, size_t len);
   int op_LessEqual(const void* arg, size_t len);
   int op_GreaterEqual(const void* arg, size_t len);
 }
@@ -498,6 +500,49 @@ int op_equal(const BinaryOpArgs& args) {
   return 1;
 }
 
+// NotEqual
+
+template <typename T>
+int notEqual_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  bool* po = reinterpret_cast<bool*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = (pi0[i] != i1);
+  }
+  return 0;
+}
+
+template <typename T>
+int notEqual_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  bool* po = reinterpret_cast<bool*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = (pi0[i] != pi1[i]);
+  }
+  return 0;
+}
+
+int op_notEqual(const BinaryOpArgs& args) {
+  if (CheckTypes(args, DT_FLOAT, DT_FLOAT, DT_BOOL)) {
+    if (args.in1.nelems == 1) {
+      return notEqual_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                             args.in0.nelems);
+    }
+    else if( args.in0.nelems == args.in1.nelems ) {
+      return notEqual_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                              args.in0.nelems);
+    }
+  }
+  
+  return 1;
+}
+
 // LessEqual
 
 template <typename T>
@@ -837,6 +882,10 @@ int op_Maximum(const void* args, size_t len)
 int op_Equal(const void* args, size_t len)
 {
   return op_Binary(args, len, op_equal, "op_Equal");
+}
+int op_NotEqual(const void* args, size_t len)
+{
+  return op_Binary(args, len, op_notEqual, "op_NotEqual");
 }
 int op_LessEqual(const void* args, size_t len)
 {
