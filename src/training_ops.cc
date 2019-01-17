@@ -9,6 +9,8 @@
 
 #include <omp.h>
 
+#include "libvetfkernel.h"
+
 REGISTER_KERNEL("ApplyAdam", "op_ApplyAdam");
 
 #define CHECK_ARG_LEN(l0, l1) \
@@ -52,7 +54,6 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
   const T one = T(1.) ; 
 
 #if 1 // optimized
- 
  
   const T k = (lr * std::sqrt( one - beta2_power) / ( one - beta1_power)) ;
 
@@ -105,6 +106,58 @@ int apply_adam(bool use_nesterov, int64_t num_elements,
 
   return 0 ;
 }
+
+template <>
+int apply_adam<float>(bool use_nesterov, int64_t num_elements,
+                      uint64_t var_ptr, uint64_t m_ptr, uint64_t v_ptr,
+                      uint64_t beta1_power_ptr, uint64_t beta2_power_ptr,
+                      uint64_t lr_ptr,
+                      uint64_t beta1_ptr, uint64_t beta2_ptr, uint64_t epsilon_ptr,
+                      uint64_t grd_ptr )
+{
+  float* var = reinterpret_cast<float*>(var_ptr);
+  float* m   = reinterpret_cast<float*>(m_ptr);
+  float* v   = reinterpret_cast<float*>(v_ptr);
+
+  const float* grd = reinterpret_cast<const float*>(grd_ptr);
+
+  const float beta1_power = reinterpret_cast<const float*>(beta1_power_ptr)[0];
+  const float beta2_power = reinterpret_cast<const float*>(beta2_power_ptr)[0];
+  const float lr = reinterpret_cast<const float*>(lr_ptr)[0];
+  const float beta1 = reinterpret_cast<const float*>(beta1_ptr)[0];
+  const float beta2 = reinterpret_cast<const float*>(beta2_ptr)[0];
+  const float epsilon = reinterpret_cast<const float*>(epsilon_ptr)[0];
+
+  const float one = 1.f ; 
+
+  const float k = (lr * std::sqrt( one - beta2_power) / ( one - beta1_power)) ;
+
+#pragma omp parallel
+  { 
+    int64_t nthreads = omp_get_num_threads() ;
+    int64_t threadid = omp_get_thread_num() ;
+
+    int64_t eachNElement = num_elements / nthreads ;
+    int64_t remain       = num_elements % nthreads ;
+
+    int64_t elementBegin = eachNElement * threadid + ( threadid < remain ? threadid : remain ) ;
+    int64_t myElement    = eachNElement + ( threadid < remain ? 1 : 0 ) ;
+
+    if( use_nesterov ) {
+      for(int64_t i=elementBegin; i<elementBegin+myElement; i++) {
+        m[i] = m[i] + (one - beta1) * (grd[i] - m[i]) ;
+        v[i] = v[i] + (one - beta2) * (grd[i]*grd[i] - v[i]) ;
+        var[i] -= k * ( m[i] * beta1 + (one-beta1) * grd[i] ) / ( epsilon + std::sqrt(v[i])) ;
+      }
+    }
+    else {
+      _apply_adam_f32(var+elementBegin, m+elementBegin, v+elementBegin,
+                      beta1, beta2, epsilon, k, myElement, grd+elementBegin ) ;
+    }
+  }
+  return 0 ;
+}
+
 }
 
 int op_ApplyAdam(const void* args, size_t len)

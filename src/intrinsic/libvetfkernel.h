@@ -34,9 +34,14 @@ int square(uint64_t out, uint64_t in, size_t n);
 
 void neg(uint64_t out, uint64_t in, size_t n);
 
+void _apply_adam_f32(float* var, float* m, float *v,
+                     const float beta1, const float beta2, 
+                     const float epsilon, const float k,
+                     const int64_t numElement, 
+                     const float *grd ) ;
+
 #ifdef __cplusplus
 }
 #endif
-
 
 #endif

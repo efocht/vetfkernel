@@ -14,5 +14,6 @@ add_library(vetfkernel_intrinsic OBJECT
 	libvetfkernel_Rsqrt.c
 	libvetfkernel_Square.c
 	libvetfkernel_Neg.c
-	libvetfkernel_Transpose.c)
+	libvetfkernel_Transpose.c
+	libvetfkernel_ApplyAdam.c)
 
