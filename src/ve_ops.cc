@@ -16,12 +16,10 @@
 
 REGISTER_KERNEL("Select", "op_Select");
 REGISTER_KERNEL("RandomUniform", "op_RandomUniform");
-REGISTER_KERNEL("Assign", "op_Assign");
 
 extern "C" {
   int op_Select(const void* args, size_t len);
   int op_RandomUniform(const void* args, size_t len);
-  int op_Assign(const void* args, size_t len);
 }
 
 namespace {
@@ -278,50 +276,6 @@ int op_randomUniform(const VEOpArgs& args)
   return 0;
 }
 
-int op_assign(const VEOpArgs& args)
-{
-#if 0
-  if (args.ninputs() != 1 || args.noutputs() != 1)
-    return 1;
-
-  if (args.input(0).nelems != args.output(0).nelems
-      || args.input(0).dtype != args.output(0).dtype)
-    return 1;
-
-  if (args.input(0).dtype == DT_FLOAT) {
-    void* po = reinterpret_cast<void*>(args.output(0).addr);
-    const void* pi = reinterpret_cast<const void*>(args.input(0).addr);
-    LOG(3) << "op_Assign: po=" << po << " pi=" << pi << " nelems=" << args.input(0).nelems;
-    memcpy(po, pi, sizeof(float) * args.input(0).nelems);
-  }
-  return 0;
-#else
-  if (args.nTensors() != 2)
-    return 1;
-  const Tensor* ti = args.tensor(0);
-  const Tensor* to = args.tensor(1);
-
-  LOG(3) << __FUNCTION__ << " ti=" << ti << " to=" << to;
-
-  if (!ti || !to)
-    return 1;
-
-  LOG(3) << __FUNCTION__ << " ti=" << ti->to_s() << " to=" << to->to_s();
-
-  if (ti->nelems != to->nelems || ti->dtype != to->dtype)
-    return 1;
-  if (ti->dtype == DT_FLOAT) {
-    void* po = reinterpret_cast<void*>(to->addr);
-    const void* pi = reinterpret_cast<const void*>(ti->addr);
-    memcpy(po, pi, sizeof(float) * ti->nelems);
-  } else {
-    return 1;
-  }
-
-  return 0;
-#endif
-}
-
 } // namespace
 
 int op_Select(const void* args, size_t len)
@@ -332,11 +286,6 @@ int op_Select(const void* args, size_t len)
 int op_RandomUniform(const void* args, size_t len)
 {
   return op_Kernel(args, len, op_randomUniform, "op_RandomUniform");
-}
-
-int op_Assign(const void* args, size_t len)
-{
-  return op_Kernel(args, len, op_assign, "op_Assign");
 }
 
 //
