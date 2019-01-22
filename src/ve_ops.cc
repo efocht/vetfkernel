@@ -303,6 +303,48 @@ template <typename TO, typename TI>
       po[i] = pi[i];
   }
 
+template <typename TO>
+  void cast2bool(const Tensor* to, const Tensor* ti) {
+    TO* po = reinterpret_cast<TO*>(to->addr);
+    const bool* pi = reinterpret_cast<const bool*>(ti->addr);
+
+#if 0 // original ( partially vectorized ) 
+    for (size_t i = 0; i < ti->nelems; ++i)
+      po[i] = pi[i];
+#else
+  const size_t n = ti->nelems ;
+
+  const size_t vloop_begin =  (to->addr) & 0x3 ;
+  const size_t vloop_end   =  n   & 0xFFFFFFFFFFFFFFFC ;
+
+#pragma novector
+  for(size_t i=0; i < vloop_begin ; i++) {
+    po[i] = pi[i] ;
+  }
+  
+  const int*  pi_i = reinterpret_cast<const int*>(&pi[vloop_begin]);
+  for(size_t j=0; j < (vloop_end - vloop_begin)>>2 ; j++) {
+    const int32_t b  = pi_i[j] ;
+
+    const int32_t b0 =   b        & 0xFF ; 
+    const int32_t b1 = ( b >>  8) & 0xFF ;
+    const int32_t b2 = ( b >> 16) & 0xFF ;
+    const int32_t b3 = ( b >> 24)        ;
+
+    po[vloop_begin+4*j+0] = b0 ;
+    po[vloop_begin+4*j+1] = b1 ;
+    po[vloop_begin+4*j+2] = b2 ;
+    po[vloop_begin+4*j+3] = b3 ;
+  }
+
+
+#pragma novector
+  for(size_t i=vloop_end; i < n ; i++) {
+    po[i] = pi[i] ;
+  }
+#endif
+  }
+
 int op_cast(const VEOpArgs& args)
 {
   if (args.nTensors() != 2)
@@ -321,11 +363,11 @@ int op_cast(const VEOpArgs& args)
     return 1;
 
   if (ti->dtype == DT_BOOL && to->dtype == DT_FLOAT) {
-    cast<float, bool>(to, ti);
+    cast2bool<float>(to, ti);
   } else if (ti->dtype == DT_INT32 && to->dtype == DT_FLOAT) {
     cast<float, int32_t>(to, ti);
   } else if (ti->dtype == DT_BOOL && to->dtype == DT_INT32) {
-    cast<int32_t, bool>(to, ti);
+    cast2bool<int32_t>(to, ti);
   } else if (ti->dtype == DT_UINT16 && to->dtype == DT_INT32) {
     cast<int32_t, uint16_t>(to, ti);
   } else if (ti->dtype == DT_INT8 && to->dtype == DT_BOOL) {

@@ -827,9 +827,35 @@ int greaterEqual_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
   const T* pi0 = reinterpret_cast<const T*>(in0);
   T i1 = *reinterpret_cast<const T*>(in1);
 
+#if 0 // original ( partialy vectorized )
   for (size_t i = 0; i < n; ++i) {
     po[i] = pi0[i] >= i1;
   }
+#else
+  const size_t vloop_begin =  out & 0x3 ;
+  const size_t vloop_end   =  n   & 0xFFFFFFFFFFFFFFFC ;
+
+#pragma novector
+  for(size_t i=0; i < vloop_begin ; i++) {
+    po[i] = pi0[i] >= i1;
+  }
+
+  int*  po_i = reinterpret_cast<int*>(&po[vloop_begin]);
+  for(size_t j=0; j < (vloop_end - vloop_begin)>>2 ; j++) {
+    const int32_t b0 = pi0[vloop_begin+4*j+0] >= i1 ? 1 : 0 ;
+    const int32_t b1 = pi0[vloop_begin+4*j+1] >= i1 ? 1 : 0 ;
+    const int32_t b2 = pi0[vloop_begin+4*j+2] >= i1 ? 1 : 0 ;
+    const int32_t b3 = pi0[vloop_begin+4*j+3] >= i1 ? 1 : 0 ;
+
+    const int32_t b  = (b3 << 24) | (b2 << 16) | (b1 <<8) | b0 ;
+    po_i[j] = b ;  
+  }
+
+#pragma novector
+  for(size_t i=vloop_end; i < n ; i++) {
+    po[i] = pi0[i] >= i1;
+  }
+#endif
   return 0;
 }
 
