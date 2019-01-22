@@ -40,36 +40,63 @@ int SparseSoftmaxXentWithLogits(int64_t batch_size, int64_t num_classes,
   T* backprop = reinterpret_cast<T*>(backprop_ptr);
 
 #if 1
-  for(int64_t i=0; i<batch_size; i++) {
-    T max_logits = T(0.) ;
-    for(int64_t j=0; j<num_classes; j++) {
-      if( max_logits < logits[i*num_classes+j]) {
-        max_logits = logits[i*num_classes+j] ;
-      }
-    }
-    for(int64_t j=0; j<num_classes; j++) {
-      backprop[i*num_classes+j] = logits[i*num_classes+j] - max_logits ;
-    }
- 
-    T sum_exp_logits = T(0.) ;
-    for(int64_t j=0; j<num_classes; j++) {
-      sum_exp_logits += std::exp(backprop[i*num_classes+j]) ;
-    }
+  if( num_classes == 2 ) {
+    for(int64_t i=0; i<batch_size; i++) {
+      const T logits0 = logits[2*i+0] ; 
+      const T logits1 = logits[2*i+1] ; 
 
-    const T log_sum_exp_logits = std::log(sum_exp_logits) ;
-    const Index label = labels[i] ;
-    T sum = T(0.) ; 
-    for(int64_t j=0; j<num_classes; j++) {
-      sum += ( j == label ? 
+      const T max_logits = logits0 > logits1 ? logits0 : logits1 ;
+       
+      const T backprop0 = logits0 - max_logits ;
+      const T backprop1 = logits1 - max_logits ;
+
+      const T exp_backprop0 = std::exp(backprop0) ;
+      const T exp_backprop1 = std::exp(backprop1) ;
+
+      const T sum_exp_logits = exp_backprop0 + exp_backprop1 ;
+
+      const T log_sum_exp_logits = std::log(sum_exp_logits) ;
+
+      const Index label = labels[i] ;
+
+      loss[i] = label == 0 ? log_sum_exp_logits - backprop0 : log_sum_exp_logits - backprop1 ;
+
+      backprop[2*i+0] = exp_backprop0 / sum_exp_logits - ( 0 == label ? T(1.) : T(0.) ) ;
+      backprop[2*i+1] = exp_backprop1 / sum_exp_logits - ( 1 == label ? T(1.) : T(0.) ) ;
+      
+    }
+  }
+  else {
+    for(int64_t i=0; i<batch_size; i++) {
+      T max_logits = T(0.) ;
+      for(int64_t j=0; j<num_classes; j++) {
+        if( max_logits < logits[i*num_classes+j]) {
+          max_logits = logits[i*num_classes+j] ;
+        }
+      }
+      for(int64_t j=0; j<num_classes; j++) {
+        backprop[i*num_classes+j] = logits[i*num_classes+j] - max_logits ;
+      }
+   
+      T sum_exp_logits = T(0.) ;
+      for(int64_t j=0; j<num_classes; j++) {
+        sum_exp_logits += std::exp(backprop[i*num_classes+j]) ;
+      }
+
+      const T log_sum_exp_logits = std::log(sum_exp_logits) ;
+      const Index label = labels[i] ;
+      T sum = T(0.) ; 
+      for(int64_t j=0; j<num_classes; j++) {
+        sum += ( j == label ? 
                      log_sum_exp_logits - backprop[i*num_classes+j] :
                      T(0.) 
-                 ) ;  
-      backprop[i*num_classes+j] = 
-        std::exp(backprop[i*num_classes+j]) / sum_exp_logits
-          - ( j == label ? T(1.) : T(0.) ) ;
+               ) ;  
+        backprop[i*num_classes+j] = 
+          std::exp(backprop[i*num_classes+j]) / sum_exp_logits
+            - ( j == label ? T(1.) : T(0.) ) ;
+      }
+      loss[i] = sum ;
     }
-    loss[i] = sum ;
-
   }
 #else // original
   // scratch = max_logits along classes.
