@@ -1063,7 +1063,7 @@ int op_Softmax(const void* args, size_t len)
         float sum = 0.f ;
         for(uint64_t i=0; i<p->num_classes; i++) {
           const float shifted_in = in[i] - max ; 
-          sum += expf(shifted_in) ;
+          sum += std::exp(shifted_in) ;
           out[i] = shifted_in ;
         }
 
@@ -1086,11 +1086,10 @@ int op_Softmax(const void* args, size_t len)
 
         float sum = 0.f ;
         for(uint64_t i=0; i<p->num_classes; i++) {
-          sum += (out[i] = expf(in[i]-max)) ;
+          sum += (out[i] = std::exp(in[i]-max)) ;
         }
 
         float inv_sum = 1.f / sum ;
-#pragma _NEC novector  // compiler bug ??
         for(uint64_t i=0; i<p->num_classes; i++) {
           out[i] *= inv_sum ;
         }
