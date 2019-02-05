@@ -1,6 +1,6 @@
 ## build
 
-see tensorflow/README.ve
+see tensorflow/README_ve.md
 
 ## run
 
