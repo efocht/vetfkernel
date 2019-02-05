@@ -14,160 +14,174 @@
 
 int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size)
 {
-	float* po = (float*)(out);
-	const float* pi = (float*)(in);
-
-	uint64_t si2 = dim_size[3];
-	uint64_t si1 = si2 * dim_size[2];
-	uint64_t si0 = si1 * dim_size[1];
-
-	uint64_t so2 = dim_size[1];
-	uint64_t so1 = so2 * dim_size[3];
-	uint64_t so0 = so1 * dim_size[2];
+  float* po = (float*)(out);
+  const float* pi = (float*)(in);
 
 
+#if 0
+  uint64_t si2 = dim_size[3];
+  uint64_t si1 = si2 * dim_size[2];
+  uint64_t si0 = si1 * dim_size[1];
 
+  uint64_t so2 = dim_size[1];
+  uint64_t so1 = so2 * dim_size[3];
+  uint64_t so0 = so1 * dim_size[2];
 
+  for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
+    for (int64_t i1 = 0; i1 < dim_size[2]; ++i1) {
+      for (int64_t i2 = 0; i2 < dim_size[3]; ++i2) {
+        for (int64_t i3 = 0; i3 < dim_size[1]; ++i3) {
+          po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
+            = pi[i0 * si0 + i1 * si2 + i2 + i3 * si1];
+        }
+      }
+    }
+  }
+#else
+  const uint64_t d0 = dim_size[0] ;
+  const uint64_t d1 = dim_size[1] ;
+  const uint64_t d2 = dim_size[2] ;
+  const uint64_t d3 = dim_size[3] ;
 
-	if(dim_size[1]*2<VLEN){
-		_ve_lvl(VLEN);
-		__vr vr_256 = _ve_vseq_v();
-		__vr vr_i1,vr_i3;
-		int d_num = VLEN/dim_size[1]; 	
-		if(dim_size[1]==64){
-			vr_i1 = _ve_vsrl_vvs(vr_256,6); // /64
-			vr_i3 = _ve_vand_vsv(63,vr_256); // %64
-		}else{
-			vr_i1 = _ve_vdivul_vvs(vr_256,dim_size[1]);
-			vr_i3 = _ve_vsubul_vvv(vr_256,_ve_vmulul_vsv(dim_size[1],vr_i1));
-		}
-		__vr vr_pos = _ve_vaddul_vvv(vr_i1,_ve_vmulul_vsv(si1,vr_i3));
+  const uint64_t d23 = d2 * d3 ;
 
+  if( d1 < (VLEN>>1) && d23 > (d1<<2) ) {
+    if( (d23&0x1)==0 && (in&0x7)==0          // d23 is even and input-array is 8-bytes aligned.
+         && (d1&0x1)==0 && (out&0x7)==0 ) {  // d1 is even and output-array is 8-bytes aligned.
+      const int64_t d23_half = d23 >> 1 ;
+      for (int64_t i0 = 0; i0 < d0; ++i0) {
+        for (int64_t i3 = 0; i3 < d1; i3+=2) {
+          for (int64_t i12 = 0; i12 < d23_half; i12+=VLEN) {
+            const int64_t vl = d23_half - i12 < VLEN ? d23_half - i12 : VLEN ;
+            _ve_lvl(vl) ;
+            __vr vr_in_0 = _ve_vld_vss(8, pi+2*i12+(i3  )*d23) ;
+            __vr vr_in_1 = _ve_vld_vss(8, pi+2*i12+(i3+1)*d23) ;
+            _ve_vst_vss(_ve_vshf_vvvs(vr_in_0, vr_in_1, VE_VSHUFFLE_ZLYL), 8*d1, po+d1*(2*i12  )+i3) ;
+            _ve_vst_vss(_ve_vshf_vvvs(vr_in_0, vr_in_1, VE_VSHUFFLE_ZUYU), 8*d1, po+d1*(2*i12+1)+i3) ;
+          }
+        }
+        pi += d1*d2*d3 ;
+        po += d1*d2*d3 ;
+      }
+    }
+    else {
+      for (int64_t i0 = 0; i0 < d0; ++i0) {
+        for (int64_t i3 = 0; i3 < d1; ++i3) {
+          for (int64_t i12 = 0; i12 < d23; i12+=VLEN) {
+            const int64_t vl = d23 - i12 < VLEN ? d23 - i12 : VLEN ;
+            _ve_lvl(vl) ;
+            __vr vr_in = _ve_vldu_vss(4, pi+i12+i3*d23) ;
+            _ve_vstu_vss(vr_in, 4*d1, po+d1*i12+i3) ;
+          }
+        }
+        pi += d1*d2*d3 ;
+        po += d1*d2*d3 ;
+      }
+    }
+  }
+  else {
+    for (int64_t i0 = 0; i0 < d0; ++i0) {
+      for (int64_t i12 = 0; i12 < d23; ++i12) {
+        for (int64_t i3 = 0; i3 < d1; i3+=VLEN) {
+          const int64_t vl = d1 - i3 < VLEN ? d1 - i3 : VLEN ;
+          _ve_lvl(vl) ;
+          __vr vr_in = _ve_vldu_vss(4*d23, pi+i12+i3*d23) ;
+          _ve_vstu_vss(vr_in, 4, po+d1*i12+i3) ;
+        }
+      }
+      pi += d1*d2*d3 ;
+      po += d1*d2*d3 ;
+    }
+  }
+#endif
 
-
-		for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-			for (int64_t i1 = 0; i1 < dim_size[2]*dim_size[3]; i1+=d_num) {
-				const int64_t vlen = dim_size[1]*(dim_size[2]*dim_size[3]-i1 < d_num ? dim_size[2]*dim_size[3]-i1:d_num);
-				_ve_lvl(vlen);
-				__vr vr_ad = _ve_vaddul_vsv((unsigned long)(pi+i0*si0+i1),_ve_vmulul_vsv(4, vr_pos));
-				__vr vr_pi = _ve_vgtu_vv(vr_ad);
-				_ve_vstu_vss(vr_pi,4,po+i0*so0+i1*dim_size[1]);
-			}
-		}
-	}else{
-		for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-			for (int64_t i1 = 0; i1 < dim_size[2]*dim_size[3]; ++i1) {
-				for (int64_t i3 = 0; i3 < dim_size[1]; i3+=VLEN) {
-					const int64_t vlen = dim_size[1]-i3 < VLEN ? dim_size[1]-i3:VLEN;
-					_ve_lvl(vlen);
-					__vr vr_pi = _ve_vldu_vss(4*si1,pi+i0*si0+i1+i3);
-					_ve_vstu_vss(vr_pi,4,po+i0*so0+i1*so2+i3);
-				}
-			}
-		}
-
-	}
-
-
-
-
-
-	return 0;
+  return 0;
 }
 
 int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size)
 {
-	float* po = (float*)(out);
-	const float* pi = (float*)(in);
-
-	uint64_t si2 = dim_size[3];
-	uint64_t si1 = si2 * dim_size[2];
-	uint64_t si0 = si1 * dim_size[1];
-
-	uint64_t so2 = dim_size[2];
-	uint64_t so1 = so2 * dim_size[1];
-	uint64_t so0 = so1 * dim_size[3];
+  float* po = (float*)(out);
+  const float* pi = (float*)(in);
 
 
+#if 0
+  uint64_t si2 = dim_size[3];
+  uint64_t si1 = si2 * dim_size[2];
+  uint64_t si0 = si1 * dim_size[1];
 
-	if(dim_size[1]*dim_size[2]*2<VLEN){
-		_ve_lvl(VLEN);
-		__vr vr_256 = _ve_vseq_v();
-		__vr vr_i2,vr_i3;
-		int d_num = VLEN/(dim_size[1]*dim_size[2]);
-		if((dim_size[1]*dim_size[2])==64){
-			vr_i3 = _ve_vsrl_vvs(vr_256,6); // /64
-			vr_i2 = _ve_vand_vsv(63,vr_256); // %64
-		}else{
-			vr_i3 = _ve_vdivul_vvs(vr_256,(dim_size[1]*dim_size[2]));
-			vr_i2 = _ve_vsubul_vvv(vr_256,_ve_vmulul_vsv((dim_size[1]*dim_size[2]),vr_i3));
-		}
-		__vr vr_pos = _ve_vaddul_vvv(vr_i3,_ve_vmulul_vsv(si2,vr_i2));
+  uint64_t so2 = dim_size[2];
+  uint64_t so1 = so2 * dim_size[1];
+  uint64_t so0 = so1 * dim_size[3];
 
+  for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
+    for (int64_t i1 = 0; i1 < dim_size[3]; ++i1) {
+      for (int64_t i2 = 0; i2 < dim_size[1]; ++i2) {
+        for (int64_t i3 = 0; i3 < dim_size[2]; ++i3) {
+          po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
+            = pi[i0 * si0 + i1 + i2 * si1 + i3 * si2];
+        }
+      }
+    }
+  }
+#else
+  const uint64_t d0 = dim_size[0] ;
+  const uint64_t d1 = dim_size[1] ;
+  const uint64_t d2 = dim_size[2] ;
+  const uint64_t d3 = dim_size[3] ;
 
+  const uint64_t d12 = d1 * d2 ;
 
-		for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-			for (int64_t i1 = 0; i1 < dim_size[3]; i1+=d_num) {
-				const int64_t vlen = dim_size[1]*dim_size[2]*(dim_size[3]-i1 < d_num ? dim_size[3]-i1:d_num);
-				_ve_lvl(vlen);
-				__vr vr_ad = _ve_vaddul_vsv((unsigned long)(pi + i0 * si0 + i1),_ve_vmulul_vsv(4, vr_pos));
-				__vr vr_pi = _ve_vgtu_vv(vr_ad);
-				_ve_vstu_vss(vr_pi,4,po + i0 * so0 + i1 * so1);
-			}
-		}
-
-	}else if(dim_size[1]*dim_size[2]<=VLEN){
-
-#if 1
-		_ve_lvl(dim_size[1]*dim_size[2]);
-
-		for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-			for (int64_t i1 = 0; i1 < dim_size[3]; i1+=2) {
-				__vr vr_pi0 = _ve_vld_vss(4*si2,pi + i0 * si0 + i1);
-				__vr vr_pi1 = _ve_vsll_vvs(vr_pi0,32);
-				_ve_vstu_vss(vr_pi1,4,po + i0 * so0 + (i1+0) * so1);
-				_ve_vstu_vss(vr_pi0,4,po + i0 * so0 + (i1+1) * so1);
-			}
-		}
-
+  if( (d3&0x1)==0 && (in&0x7)==0 ) { // d3 is even and input-array is 8-bytes aligned.
+    if ( (d12&0x1)==0 && (out&0x7)==0 ) { // d12 is even and output-array is 8-bytes aligned.
+      const int64_t d12_half = d12 >> 1 ;
+      for (int64_t i0 = 0; i0 < d0; ++i0) {
+        for (int64_t i1 = 0; i1 < d3; i1+=2) {
+          for (int64_t i23 = 0; i23 < d12_half; i23+=VLEN) {
+            const int64_t vl = d12_half - i23 < VLEN ? d12_half - i23 : VLEN ;
+            _ve_lvl(vl) ;
+            __vr vr_in_0 = _ve_vld_vss(8*d3, pi+i1+(2*i23  )*d3) ;
+            __vr vr_in_1 = _ve_vld_vss(8*d3, pi+i1+(2*i23+1)*d3) ;
+            _ve_vst_vss(_ve_vshf_vvvs(vr_in_0, vr_in_1, VE_VSHUFFLE_ZLYL ), 8, po+(i1+0)*d12+2*i23) ;
+            _ve_vst_vss(_ve_vshf_vvvs(vr_in_0, vr_in_1, VE_VSHUFFLE_ZUYU ), 8, po+(i1+1)*d12+2*i23) ;
+          }
+        }
+        pi += d1*d2*d3 ;
+        po += d1*d2*d3 ;
+      }
+    }
+    else {
+      for (int64_t i0 = 0; i0 < d0; ++i0) {
+        for (int64_t i1 = 0; i1 < d3; i1+=2) {
+          for (int64_t i23 = 0; i23 < d12; i23+=VLEN) {
+            const int64_t vl = d12 - i23 < VLEN ? d12 - i23 : VLEN ;
+            _ve_lvl(vl) ;
+            __vr vr_in = _ve_vld_vss(4*d3, pi+i1+i23*d3) ;
+            _ve_vstl_vss(vr_in, 4, po+(i1+0)*d12+i23) ;
+            _ve_vstu_vss(vr_in, 4, po+(i1+1)*d12+i23) ;
+          }
+        }
+        pi += d1*d2*d3 ;
+        po += d1*d2*d3 ;
+      }
+    }
+  }
+  else {
+    for (int64_t i0 = 0; i0 < d0; ++i0) {
+      for (int64_t i1 = 0; i1 < d3; ++i1) {
+        for (int64_t i23 = 0; i23 < d12; i23+=VLEN) {
+          const int64_t vl = d12 - i23 < VLEN ? d12 - i23 : VLEN ;
+          _ve_lvl(vl) ;
+          __vr vr_in = _ve_vldu_vss(4*d3, pi+i1+i23*d3) ;
+          _ve_vstu_vss(vr_in, 4, po+i1*d12+i23) ;
+        }
+      }
+      pi += d1*d2*d3 ;
+      po += d1*d2*d3 ;
+    }
+  }
 #endif
 
-
-	}else if(dim_size[1]*dim_size[2]%2==0){
-
-#if 1
-		for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-			for (int64_t i1 = 0; i1 < dim_size[3]; i1+=2) {
-				for (int64_t i3 = 0; i3 < dim_size[1]*dim_size[2]; i3+=VLEN) {
-					const int64_t vlen = dim_size[1]*dim_size[2]-i3 < VLEN ? dim_size[1]*dim_size[2]-i3:VLEN;
-					_ve_lvl(vlen);
-					__vr vr_pi0 = _ve_vld_vss(4*si2,pi + i0 * si0 + si2*i3 + i1);
-					__vr vr_pi1 = _ve_vsll_vvs(vr_pi0,32);
-					_ve_vstu_vss(vr_pi1,4,po + i0 * so0 + (i1+0) * so1 + i3);
-					_ve_vstu_vss(vr_pi0,4,po + i0 * so0 + (i1+1) * so1 + i3);
-				}
-			}
-		}
-#endif
-
-
-	}else{
-		for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-			for (int64_t i1 = 0; i1 < dim_size[3]; i1++) {
-				for (int64_t i3 = 0; i3 < dim_size[1]*dim_size[2]; i3+=VLEN) {
-					const int64_t vlen = dim_size[1]*dim_size[2]-i3 < VLEN ? dim_size[1]*dim_size[2]-i3:VLEN;
-					_ve_lvl(vlen);
-					__vr vr_pi = _ve_vldu_vss(4*si2,pi + i0 * si0 + si2*i3 + i1);
-					_ve_vstu_vss(vr_pi,4,po + i0 * so0 + i1 * so1 + i3);
-				}
-			}
-		}
-
-
-	}
-
-
-	return 0;
+  return 0;
 }
 
 
