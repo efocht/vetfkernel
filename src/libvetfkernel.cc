@@ -3,10 +3,31 @@
 #include <cstring>
 #include <string>
 
+#include <sched.h>
+#include <omp.h>
+
 #include "kernel.h"
 #include "log.h"
 
 #define MAX_KERNEL 1024
+
+
+class OMP_Affinity
+{
+public :
+  OMP_Affinity() {
+#pragma omp parallel
+    {
+      int threadid = omp_get_thread_num() ;
+      cpu_set_t mask ;
+      CPU_ZERO(&mask) ;
+      CPU_SET(threadid, &mask) ;
+      sched_setaffinity(0, sizeof(mask), &mask ) ;
+    }
+  }
+} ;
+
+static OMP_Affinity omp_affinity ;
 
 extern "C" {
     int get_num_kernels();
