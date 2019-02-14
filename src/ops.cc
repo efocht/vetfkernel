@@ -1012,8 +1012,19 @@ int op_MatMul(const void* args, size_t len)
 #endif
     } else if (!p->transpose_a && p->transpose_b) {
       assert(p->dim_size_a[1] == p->dim_size_b[1]);
+#if 1
       ret = matmul<float, 'N', 'T'>(
           p->out, p->a, p->b, p->dim_size_a[0], p->dim_size_b[0], p->dim_size_a[1]);
+#else
+      /* vednn version */
+      const uint64_t inDim  = p->dim_size_b[0] ;
+      const uint64_t outDim = p->dim_size_a[1] ;
+      const uint64_t nBatch = p->dim_size_a[0] ;
+      const void* pDataGradOut = reinterpret_cast<const void*>(p->a);
+      const void* pDataWeight  = reinterpret_cast<const void*>(p->b);
+      void*       pDataGradIn  = reinterpret_cast<void*>(p->out);
+      ret = vednnLinearBackwardData(inDim,outDim,nBatch, pDataGradOut, pDataWeight, pDataGradIn) ;
+#endif
     } else if (p->transpose_a && !p->transpose_b) {
       assert(p->dim_size_a[0] == p->dim_size_b[0]);
       ret = matmul<float, 'T', 'N'>(
@@ -1051,8 +1062,12 @@ int op_Softmax(const void* args, size_t len)
     const float* in = reinterpret_cast<const float*>(p->in);
     float* out = reinterpret_cast<float*>(p->out);
 
-// [todo] use vednn
     if( p->bool_log ) {
+#if 1	// use vednn
+      return vednnSoftmaxForward( VEDNN_SOFTMAX_LOG,
+                                 (void *)(p->in), (void*)(p->out),
+                                 p->batch_size, p->num_classes) ;
+#else
       // LogSoftmax
       for(uint64_t b=0; b<p->batch_size; b++) {
         float max = -FLT_MAX ;
@@ -1075,8 +1090,14 @@ int op_Softmax(const void* args, size_t len)
         in  += p->num_classes ; 
         out += p->num_classes ; 
       }
+#endif
     }
     else {
+#if 1	// use vednn
+      return vednnSoftmaxForward( VEDNN_SOFTMAX_ACCURATE,
+                                 (void *)(p->in), (void*)(p->out),
+                                 p->batch_size, p->num_classes) ;
+#else
       // Softmax
       for(uint64_t b=0; b<p->batch_size; b++) {
         float max = -FLT_MAX ;
@@ -1097,6 +1118,7 @@ int op_Softmax(const void* args, size_t len)
         in  += p->num_classes ; 
         out += p->num_classes ; 
       }
+#endif
     }
     ret = 0 ;
   }
