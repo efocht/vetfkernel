@@ -740,6 +740,19 @@ template<typename Tin, typename Tout>
       po[i] = std::log(pi[i]) ;
     }
   }
+
+#if defined(__NEC_VERSION__) && (__NEC_VERSION__ >= 20000) // current compiler (2.1.21) does not vectorize std::log, logf
+template<>
+  void op_log<float,float>(uint64_t out, uint64_t in, size_t nelems)
+  {
+    float* po = reinterpret_cast<float*>(out);
+    const float* pi = reinterpret_cast<float*>(in);
+
+    for (int64_t i = 0; i < nelems; ++i) {
+      po[i] = __builtin_logf(pi[i]) ;
+    }
+  }
+#endif
 }
 
 int op_Log(const void* args, size_t len)
