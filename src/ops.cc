@@ -1374,7 +1374,28 @@ int unary_op(const void* args, size_t len,
 
   int ret = 1;
   if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
-    ret = func_f32_f32(p->out.addr, p->in.addr, p->in.nelems);
+    if( p->in.nelems >= 2048 ) {
+#pragma omp parallel
+      {
+        int64_t nthreads = omp_get_num_threads() ;
+        int64_t threadid = omp_get_thread_num() ;
+
+        int64_t chunkSize = p->in.nelems / nthreads ;
+        int64_t remain    = p->in.nelems % nthreads ;
+
+        int64_t chunkBegin = chunkSize * threadid + ( threadid < remain ? threadid : remain ) ;
+        int64_t myChunk    = chunkSize + ( threadid < remain ? 1 : 0 ) ;
+
+        int64_t offset    = sizeof(float) * chunkBegin ;
+
+        if( myChunk > 0 ) {
+          ret = func_f32_f32(p->out.addr+offset, p->in.addr+offset, myChunk);
+        }
+      }
+    }
+    else {
+      ret = func_f32_f32(p->out.addr, p->in.addr, p->in.nelems);
+    }
   }
 
   LOG(2) << __FUNCTION__ << " end. ret=" << ret;
