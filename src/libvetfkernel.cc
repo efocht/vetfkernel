@@ -6,16 +6,26 @@
 #include <sched.h>
 #include <omp.h>
 
+#include "asl.h"
 #include "kernel.h"
 #include "log.h"
 
 #define MAX_KERNEL 1024
 
-
-class OMP_Affinity
+class InitVETFKernel
 {
 public :
-  OMP_Affinity() {
+  InitVETFKernel() {
+    setaffinity() ;
+    ASL::initialize() ;
+  }
+
+  ~InitVETFKernel() {
+    ASL::finalize() ;
+  }
+
+private :
+  void setaffinity() {
 #pragma omp parallel
     {
       int threadid = omp_get_thread_num() ;
@@ -25,9 +35,7 @@ public :
       sched_setaffinity(0, sizeof(mask), &mask ) ;
     }
   }
-} ;
-
-static OMP_Affinity omp_affinity ;
+} _InitVETFKernel ; 
 
 extern "C" {
     int get_num_kernels();

@@ -1,10 +1,9 @@
 #include <cstdint>
+#include "asl.h"
 #include "kernel.h"
 #include "types.h"
 #include "log.h"
 #include <sstream>
-
-#include <asl.h>
 
 #define DEFINE_KERNEL(NAME, FUNC) \
   REGISTER_KERNEL(#NAME, "op_" # NAME); \
@@ -219,32 +218,6 @@ int op_select(const VEOpArgs& args)
 
 int op_randomUniform(const VEOpArgs& args)
 {
-#if 0
-  if (args.ninputs() != 0 || args.noutputs() != 1)
-    return 1;
-
-  LOG(3) << "op_RandomUniform: nelems=" << args.output(0).nelems;
-
-  asl_random_t hnd;
-
-  if (asl_random_create(&hnd, ASL_RANDOMMETHOD_AUTO) != ASL_ERROR_OK) {
-    fprintf(stderr, "asl_random_create failed\n");
-    exit(-1);
-  }
-
-  if (args.output(0).dtype == DT_FLOAT) {
-    float* p = reinterpret_cast<float*>(args.output(0).addr);
-    if (asl_random_generate_s(hnd, args.output(0).nelems, p) != ASL_ERROR_OK) {
-      fprintf(stderr, "asl_random_generate_d failed\n");
-      exit(-1);
-    }
-  }
-
-  if (asl_random_destroy(hnd) != ASL_ERROR_OK) {
-    fprintf(stderr, "asl_random_destroy failed\n");
-    exit(-1);
-  }
-#else
   if (args.nTensors() != 1)
     return 1;
 
@@ -252,26 +225,10 @@ int op_randomUniform(const VEOpArgs& args)
 
   LOG(3) << "op_RandomUniform: nelems=" << t->nelems;
 
-  asl_random_t hnd;
-
-  if (asl_random_create(&hnd, ASL_RANDOMMETHOD_AUTO) != ASL_ERROR_OK) {
-    fprintf(stderr, "asl_random_create failed\n");
-    exit(-1);
-  }
-
   if (t->dtype == DT_FLOAT) {
     float* p = reinterpret_cast<float*>(t->addr);
-    if (asl_random_generate_s(hnd, t->nelems, p) != ASL_ERROR_OK) {
-      fprintf(stderr, "asl_random_generate_d failed\n");
-      exit(-1);
-    }
+    ASL::getRandom(t->nelems, p) ;
   }
-
-  if (asl_random_destroy(hnd) != ASL_ERROR_OK) {
-    fprintf(stderr, "asl_random_destroy failed\n");
-    exit(-1);
-  }
-#endif
 
   return 0;
 }
