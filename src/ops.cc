@@ -1261,7 +1261,7 @@ int slice1(uint64_t input_ptr, uint64_t output_ptr,
   T* po = reinterpret_cast<T*>(output_ptr);
 
   const T* pi_ = pi + index ;
-  for(int i=0; i1<output_size; i++) {
+  for(int i=0; i<output_size; i++) {
     po[i] = pi_[i] ;
   }
 
@@ -1290,10 +1290,9 @@ template <typename T>
 int slice_handle(uint64_t input_dims, uint64_t input_ptr, uint64_t output_ptr, uint64_t *array) 
 {
   int ret=1 ;
-
   switch( input_dims ) {
   case 1 :
-    //ret = slice1<T>(input_ptr, output_ptr, array[0], array[1], array[2]) ;
+    ret = slice1<T>(input_ptr, output_ptr, array[0], array[1], array[2]) ;
     break ;
   case 2 :
     ret = slice2<T>(input_ptr, output_ptr, array, array+2, array+4) ;
