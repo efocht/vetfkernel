@@ -16,6 +16,7 @@ REGISTER_KERNEL("Mul", "op_Mul");
 REGISTER_KERNEL("Div", "op_Div");
 REGISTER_KERNEL("DivNoNan", "op_DivNoNan");
 REGISTER_KERNEL("SquaredDifference", "op_SquaredDifference")
+REGISTER_KERNEL("RsqrtGrad", "op_RsqrtGrad")
 REGISTER_KERNEL("Minimum", "op_Minimum");
 REGISTER_KERNEL("Maximum", "op_Maximum");
 REGISTER_KERNEL("Equal", "op_Equal");
@@ -30,6 +31,7 @@ extern "C" {
   int op_Div(const void* arg, size_t len);
   int op_DivNoNan(const void* arg, size_t len);
   int op_SquaredDifference(const void* arg, size_t len);
+  int op_RsqrtGrad(const void* arg, size_t len);
   int op_Minimum(const void* arg, size_t len);
   int op_Maximum(const void* arg, size_t len);
   int op_Equal(const void* arg, size_t len);
@@ -906,6 +908,45 @@ int op_sqdiff(const BinaryOpArgs& args) {
   return 1;
 }
 
+
+// RsqrtGrad
+template <typename T>
+int rsqrt_grad_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0  = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    T out     = pi0[i] ;
+    T gradout = pi1[i] ;
+    po[i] = T(-0.5) * gradout * out * out * out ;
+  }
+
+  return 0;
+}
+int op_rsqrt_grad(const BinaryOpArgs& args) {
+
+//  printf("args.in0.dims = %ld\n", args.in0.dims) ;
+//  for(int i=0; i<args.in0.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in0.dim_size[i]) ;
+//  printf("args.in1.dims = %ld\n", args.in1.dims) ;
+//  for(int i=0; i<args.in1.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in1.dim_size[i]) ;
+
+  if (CheckTypesAll(args, DT_FLOAT)) {
+
+    int r=1;
+
+    if (args.in0.nelems == args.in1.nelems) {
+     r = rsqrt_grad_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                           args.in0.nelems);
+    }
+
+    return r;
+  }
+  return 1;
+}
+
+
 // Minimum
 
 template <typename T>
@@ -1038,6 +1079,12 @@ int op_SquaredDifference(const void* args, size_t len)
 {
   return op_Binary(args, len, op_sqdiff, "op_SquaredDifference");
 }
+
+int op_RsqrtGrad(const void* args, size_t len)
+{
+  return op_Binary(args, len, op_rsqrt_grad, "op_RsqrtGrad");
+}
+
 
 int op_Minimum(const void* args, size_t len)
 {
