@@ -10,23 +10,6 @@
 #include "libvetfkernel.h"
 #endif
 
-
-//#define SET_TIMER
-
-#ifdef SET_TIMER
-#ifdef __ve__
-static inline unsigned long long __veperf_get_stm() {
-        void *vehva = (void *)0x1000;
-        unsigned long long val;
-        asm volatile ("lhm.l %0,0(%1)":"=r"(val):"r"(vehva));
-        return val;
-}
-#endif
-#endif
-
-
-
-
 REGISTER_KERNEL("Add", "op_Add");
 REGISTER_KERNEL("Sub", "op_Sub");
 REGISTER_KERNEL("Mul", "op_Mul");
@@ -118,8 +101,6 @@ int op_Binary(const void* args, size_t len,
 }
 
 // Add
-#ifndef LIBVETF_INTRINSIC
-
 template <typename T>
 int add_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 {
@@ -134,6 +115,14 @@ int add_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
   return 0;
 }
 
+#ifdef LIBVETF_INTRINSIC
+template <>
+int add_n1<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  return add_n1_f32(out,in0,in1,n) ;
+}
+#endif
+
 template <typename T>
 int add_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 {
@@ -147,59 +136,33 @@ int add_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 
   return 0;
 }
+
+#ifdef LIBVETF_INTRINSIC
+template <>
+inline int add_nn<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  return add_nn_f32(out,in0,in1,n) ;
+}
 #endif
+
 
 int op_add(const BinaryOpArgs& args) {
   if (CheckTypesAll(args, DT_FLOAT)) {
 
     int r=1;
 
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
-#endif
-
     if (args.in0.nelems == 1) {
-#ifndef LIBVETF_INTRINSIC
       r = add_n1<float>(args.out.addr, args.in1.addr, args.in0.addr,
                            args.out.nelems);
-#else
-     r = add_n1(args.out.addr, args.in1.addr, args.in0.addr,
-                           args.out.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("add n1: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
     } else if (args.in1.nelems == 1) {
-#ifndef LIBVETF_INTRINSIC
       r = add_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
-#else
-   r = add_n1(args.out.addr, args.in0.addr, args.in1.addr,
-                           args.out.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("add n1: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
     } else if (args.in0.nelems == args.in1.nelems) {
-#ifndef LIBVETF_INTRINSIC
       r = add_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.in0.nelems);
-#else
-   r = add_nn(args.out.addr, args.in0.addr, args.in1.addr,
-                           args.in0.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("add nn: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
     }
   
-  return r;
+    return r;
   }
   return 1;
 }
@@ -232,7 +195,6 @@ int sub_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
-#ifndef LIBVETF_INTRINSIC
 template <typename T>
 int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 {
@@ -244,6 +206,13 @@ int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
     po[i] = pi0[i] - pi1[i];
   }
   return 0;
+}
+
+#ifdef LIBVETF_INTRINSIC
+template <>
+inline int sub_nn<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  return sub_nn_f32(out,in0,in1,nelems) ;
 }
 #endif
 
@@ -278,22 +247,8 @@ int op_sub(const BinaryOpArgs& args) {
                         args.out.nelems);
     }
     else if (args.in0.nelems == args.in1.nelems) {
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
-#endif
-
-#ifndef LIBVETF_INTRINSIC
       r = sub_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.in0.nelems);
-#else
-      r = sub_nn(args.out.addr, args.in0.addr, args.in1.addr,
-                           args.in0.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("sub nn: %d, 		%lf ms\n",args.in0.nelems,(end-start)/(800e3));
-#endif
     }
     else if (args.in0.dims == 2
                && args.in1.dims == 2
@@ -311,8 +266,6 @@ int op_sub(const BinaryOpArgs& args) {
 }
 
 // Mul
-#ifndef LIBVETF_INTRINSIC
-
 template <typename T>
 int mul_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 {
@@ -327,6 +280,14 @@ int mul_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
   return 0;
 }
 
+#ifdef LIBVETF_INTRINSIC
+template <>
+inline int mul_n1<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  return mul_n1_f32(out, in0, in1, n) ;
+}
+#endif
+
 template <typename T>
 int mul_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 {
@@ -339,6 +300,13 @@ int mul_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
   }
 
   return 0;
+}
+
+#ifdef LIBVETF_INTRINSIC
+template <>
+inline int mul_nn<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  return mul_nn_f32(out, in0, in1, n) ;
 }
 #endif
 
@@ -363,57 +331,20 @@ int mul2_nn_n1(uint64_t out,
 }
 
 int op_mul(const BinaryOpArgs& args) {
+
   if (CheckTypesAll(args, DT_FLOAT)) {
 
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
-#endif
     int r=1;
 
-
     if (args.in0.nelems == 1) {
-#ifndef LIBVETF_INTRINSIC
      r = mul_n1<float>(args.out.addr, args.in1.addr, args.in0.addr,
                            args.out.nelems);
-#else
-     r = mul_n1(args.out.addr, args.in1.addr, args.in0.addr,
-                           args.out.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("mul n1: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
-
     } else if (args.in1.nelems == 1) {
-#ifndef LIBVETF_INTRINSIC
      r = mul_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
-#else
-     r = mul_n1(args.out.addr, args.in0.addr, args.in1.addr,
-                           args.out.nelems);
-#endif
-
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("mul n1: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
-
     } else if (args.in0.nelems == args.in1.nelems) {
-#ifndef LIBVETF_INTRINSIC
      r = mul_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.in0.nelems);
-#else
-     r = mul_nn(args.out.addr, args.in0.addr, args.in1.addr,
-                           args.in0.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("mul nn: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
-
     } else if (args.in0.dims == 2 && args.in1.dims == 2 
                && args.in0.dim_size[0] == args.in1.dim_size[0] ) {
       if( args.in1.dim_size[1] == 1 ) {
@@ -583,7 +514,6 @@ int div_1n(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
-#ifndef LIBVETF_INTRINSIC
 template <typename T>
 int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 {
@@ -596,6 +526,14 @@ int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   }
   return 0;
 }
+
+#ifdef LIBVETF_INTRINSIC
+template <>
+inline int div_n1<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  return div_n1_f32(out, in0, in1, nelems) ;
+}
+#endif
 
 // nelems_in0 > nelems_in1
 template <typename T>
@@ -616,6 +554,17 @@ int div2_nn_n1(uint64_t out,
   }
   return 0;
 }
+
+#ifdef LIBVETF_INTRINSIC
+template <>
+inline int div2_nn_n1<float>(uint64_t out,
+                             uint64_t in0,
+			     uint64_t in1,
+			     size_t n0,
+			     size_t n1)
+{
+  return div2_nn_n1_f32(out, in0, in1, n0, n1) ;
+}
 #endif
 
 int op_div(const BinaryOpArgs& args) {
@@ -623,57 +572,23 @@ int op_div(const BinaryOpArgs& args) {
 
     int r=1;
 
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
-#endif
-
     if (args.in0.nelems == 1) {
       /* TODO : impl intrinsic */
       r = div_1n<float>(args.out.addr, args.in0.addr, args.in1.addr,
                         args.out.nelems);
 
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("div n1: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
-
     } else if (args.in1.nelems == 1) {
-      /* FIXME : modify a bug in intrinsic version */
-#ifndef LIBVETF_INTRINSIC
       r = div_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
-#else
-      r = div_n1(args.out.addr, args.in0.addr, args.in1.addr,
-                           args.out.nelems);
-#endif
-
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("div n1: %d, 		%lf ms\n",args.out.nelems,(end-start)/(800e3));
-#endif
-
     } else if (args.in0.dims == 2
                && args.in1.dims == 2
                && args.in0.dim_size[0] == args.in1.dim_size[0]
                && args.in1.dim_size[1] == 1) {
-#ifndef LIBVETF_INTRINSIC
       r = div2_nn_n1<float>(args.out.addr,
                                args.in0.addr,
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
-#else
-      r = div2_nn_n1(args.out.addr,
-                               args.in0.addr,
-                               args.in1.addr,
-                               args.in0.dim_size[0],
-                               args.in0.dim_size[1]);
-#endif
-#ifdef SET_TIMER
-      unsigned long long end = __veperf_get_stm();
-      printf("div2 nn n1: %d %d, 		%lf ms\n",args.in0.dim_size[0],args.in0.dim_size[1],(end-start)/(800e3));
-#endif
-
     }
     return r;
   }

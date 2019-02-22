@@ -11,7 +11,7 @@
 #define NCHW_IDX(n,c,h,w,cl,hl,wl) ((((n)*(cl)+(c))*(hl)+(h))*(wl)+(w))
 
 
-int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+int sub_nn_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 {
 	float* po = (float*)(out);
 	const float* pi0 = (const float*)(in0);

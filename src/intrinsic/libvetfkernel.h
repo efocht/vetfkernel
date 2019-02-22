@@ -17,16 +17,16 @@ int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size);
 
 
 
-int add_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
-int add_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int add_n1_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int add_nn_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
 
-int sub_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int sub_nn_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
 
-int mul_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
-int mul_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int mul_n1_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int mul_nn_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
 
-int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
-int div2_nn_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1);
+int div_n1_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n);
+int div2_nn_n1_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n0, size_t n1);
 
 int sqrt_(uint64_t out, uint64_t in, size_t n);
 int rsqrt(uint64_t out, uint64_t in, size_t n);
