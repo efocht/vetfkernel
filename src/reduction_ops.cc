@@ -318,6 +318,23 @@ int op_Prod(const void* args, size_t len)
 
 namespace {
 template <typename T>
+int mean_d2a0(uint64_t out, uint64_t in, size_t dim0, size_t dim1)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi = reinterpret_cast<const T*>(in);
+
+  for (size_t j = 0; j < dim1; ++j) {
+    T s = T(0);
+    for (size_t i = 0; i < dim0; ++i) {
+      s += pi[i * dim1 + j];
+    }
+    po[j] = s / dim0 ;
+  }
+
+  return 0;
+}
+
+template <typename T>
 int mean_d2a1(uint64_t out, uint64_t in, size_t dim0, size_t dim1)
 {
   T* po = reinterpret_cast<T*>(out);
@@ -359,9 +376,15 @@ int op_Mean(const void* args, size_t len)
     << " ndims=" << p->ndims
     << " axis=" << p->axis;
 
+
   if (p->dtype == DT_FLOAT) {
-    if (p->ndims == 2 && p->axis == 1) {
-      ret = mean_d2a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+    if (p->ndims == 2 ) {
+      if ( p->axis == 1 ) {
+        ret = mean_d2a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+      }
+      else if ( p->axis == 0) {
+        ret = mean_d2a0<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+      }
     }
   }
 

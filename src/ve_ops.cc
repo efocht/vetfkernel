@@ -356,6 +356,11 @@ int op_tile(const VEOpArgs& args)
     << " ti=" << ti->to_s()
     << " to=" << to->to_s();
 
+//  printf("ti->dims = %ld\n", ti->dims) ;
+//  for(int i=0; i<ti->dims ; i++ ) printf(" [%d] = %ld\n", i, ti->dim_size[i]) ;
+//  printf("to->dims = %ld\n", to->dims) ;
+//  for(int i=0; i<to->dims ; i++ ) printf(" [%d] = %ld\n", i, to->dim_size[i]) ;
+
   if (ti->dtype == DT_FLOAT && to->dtype == DT_FLOAT) {
     const float* pi = reinterpret_cast<const float*>(ti->addr);
     float* po = reinterpret_cast<float*>(to->addr);
@@ -369,6 +374,14 @@ int op_tile(const VEOpArgs& args)
       for (size_t i = 0; i < ti->dim_size[0]; ++i) {
         for (size_t j = 0; j < to->dim_size[1]; ++j) {
           po[i * to->dim_size[1] + j] = pi[i];
+        }
+      }
+    } else if (ti->dims == 2 && to->dims == 2
+               && ti->dim_size[1] == to->dim_size[1]
+               && ti->dim_size[0] == 1) {
+      for (size_t i = 0; i < to->dim_size[0]; ++i) {
+        for (size_t j = 0; j < to->dim_size[1]; ++j) {
+          po[i * to->dim_size[1] + j] = pi[j];
         }
       }
     } else 
