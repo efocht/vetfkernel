@@ -15,6 +15,7 @@ REGISTER_KERNEL("Sub", "op_Sub");
 REGISTER_KERNEL("Mul", "op_Mul");
 REGISTER_KERNEL("Div", "op_Div");
 REGISTER_KERNEL("DivNoNan", "op_DivNoNan");
+REGISTER_KERNEL("SquaredDifference", "op_SquaredDifference")
 REGISTER_KERNEL("Minimum", "op_Minimum");
 REGISTER_KERNEL("Maximum", "op_Maximum");
 REGISTER_KERNEL("Equal", "op_Equal");
@@ -28,6 +29,7 @@ extern "C" {
   int op_Mul(const void* arg, size_t len);
   int op_Div(const void* arg, size_t len);
   int op_DivNoNan(const void* arg, size_t len);
+  int op_SquaredDifference(const void* arg, size_t len);
   int op_Minimum(const void* arg, size_t len);
   int op_Maximum(const void* arg, size_t len);
   int op_Equal(const void* arg, size_t len);
@@ -780,6 +782,130 @@ int op_divnonan(const BinaryOpArgs& args) {
   return 1;
 }
 
+
+// SquaredDifference
+template <typename T>
+int sqdiff_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  T i1 = *reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    T diff = pi0[i] - i1 ;
+    po[i] = diff * diff;
+  }
+
+  return 0;
+}
+
+template <typename T>
+int sqdiff_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    T diff = pi0[i] - pi1[i];
+    po[i] = diff * diff ;
+  }
+
+  return 0;
+}
+
+// nelems_in0 > nelems_in1
+template <typename T>
+int sqdiff2_nn_n1(uint64_t out,
+               uint64_t in0,
+               uint64_t in1,
+               size_t n0,
+               size_t n1)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n0; ++i) {
+    for (size_t j = 0; j < n1; ++j) {
+      T diff = pi0[i * n1 + j] - pi1[i];
+      po[i * n1 + j] = diff * diff ;
+    }
+  }
+  return 0;
+}
+
+template <typename T>
+int sqdiff2_nn_1n(uint64_t out,
+               uint64_t in0,
+               uint64_t in1,
+               size_t n0,
+               size_t n1)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n0; ++i) {
+    for (size_t j = 0; j < n1; ++j) {
+      T diff = pi0[i * n1 + j] - pi1[j];
+      po[i * n1 + j] = diff * diff ;
+    }
+  }
+  return 0;
+}
+
+int op_sqdiff(const BinaryOpArgs& args) {
+
+//  printf("args.in0.dims = %ld\n", args.in0.dims) ;
+//  for(int i=0; i<args.in0.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in0.dim_size[i]) ;
+//  printf("args.in1.dims = %ld\n", args.in1.dims) ;
+//  for(int i=0; i<args.in1.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in1.dim_size[i]) ;
+
+  if (CheckTypesAll(args, DT_FLOAT)) {
+
+    int r=1;
+
+    if (args.in0.nelems == 1) {
+     r = sqdiff_n1<float>(args.out.addr, args.in1.addr, args.in0.addr,
+                           args.out.nelems);
+    } else if (args.in1.nelems == 1) {
+     r = sqdiff_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                           args.out.nelems);
+    } else if (args.in0.nelems == args.in1.nelems) {
+     r = sqdiff_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                           args.in0.nelems);
+    } else if (args.in0.dims == 2 && args.in1.dims == 2
+               && args.in0.dim_size[0] == args.in1.dim_size[0] ) {
+      if( args.in1.dim_size[1] == 1 ) {
+        r = sqdiff2_nn_n1<float>(args.out.addr,
+                               args.in0.addr,
+                               args.in1.addr,
+                               args.in0.dim_size[0],
+                               args.in0.dim_size[1]);
+      }
+      else if( args.in0.dim_size[1] == 1 ) {
+        r = sqdiff2_nn_n1<float>(args.out.addr,
+                               args.in1.addr,
+                               args.in0.addr,
+                               args.in1.dim_size[0],
+                               args.in1.dim_size[1]);
+      }
+    } else if (args.in0.dims == 2 && args.in1.dims == 2
+	        && args.in0.dim_size[1] == args.in1.dim_size[1]
+		&& args.in1.dim_size[0] == 1 ) {
+      r = sqdiff2_nn_1n<float>(args.out.addr,
+	                    args.in0.addr,
+			    args.in1.addr,
+			    args.in0.dim_size[0],
+			    args.in0.dim_size[1]) ;
+    }
+
+    return r;
+  }
+  return 1;
+}
+
 // Minimum
 
 template <typename T>
@@ -906,6 +1032,11 @@ int op_Div(const void* args, size_t len)
 int op_DivNoNan(const void* args, size_t len)
 {
   return op_Binary(args, len, op_divnonan, "op_DivNoNan");
+}
+
+int op_SquaredDifference(const void* args, size_t len)
+{
+  return op_Binary(args, len, op_sqdiff, "op_SquaredDifference");
 }
 
 int op_Minimum(const void* args, size_t len)
