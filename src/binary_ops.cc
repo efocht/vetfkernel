@@ -15,6 +15,7 @@ REGISTER_KERNEL("Sub", "op_Sub");
 REGISTER_KERNEL("Mul", "op_Mul");
 REGISTER_KERNEL("Div", "op_Div");
 REGISTER_KERNEL("DivNoNan", "op_DivNoNan");
+REGISTER_KERNEL("Pow", "op_Pow");
 REGISTER_KERNEL("SquaredDifference", "op_SquaredDifference")
 REGISTER_KERNEL("RsqrtGrad", "op_RsqrtGrad")
 REGISTER_KERNEL("Minimum", "op_Minimum");
@@ -30,6 +31,7 @@ extern "C" {
   int op_Mul(const void* arg, size_t len);
   int op_Div(const void* arg, size_t len);
   int op_DivNoNan(const void* arg, size_t len);
+  int op_Pow(const void* arg, size_t len);
   int op_SquaredDifference(const void* arg, size_t len);
   int op_RsqrtGrad(const void* arg, size_t len);
   int op_Minimum(const void* arg, size_t len);
@@ -785,6 +787,45 @@ int op_divnonan(const BinaryOpArgs& args) {
 }
 
 
+// Pow
+template <typename T>
+int pow_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    T diff = pi0[i] - pi1[i];
+    po[i] = std::pow(pi0[i],pi1[i]) ;
+  }
+
+  return 0;
+}
+
+int op_pow(const BinaryOpArgs& args) {
+
+//  printf("args.in0.dims = %ld\n", args.in0.dims) ;
+//  for(int i=0; i<args.in0.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in0.dim_size[i]) ;
+//  printf("args.in1.dims = %ld\n", args.in1.dims) ;
+//  for(int i=0; i<args.in1.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in1.dim_size[i]) ;
+
+  if (CheckTypesAll(args, DT_FLOAT)) {
+
+    int r=1;
+
+    // TODO : impl other patterns
+    if (args.in0.nelems == args.in1.nelems) {
+     r = pow_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                           args.in0.nelems);
+    }
+
+    return r;
+  }
+  return 1;
+}
+
+
 // SquaredDifference
 template <typename T>
 int sqdiff_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
@@ -936,6 +977,7 @@ int op_rsqrt_grad(const BinaryOpArgs& args) {
 
     int r=1;
 
+    // TODO : impl other patterns
     if (args.in0.nelems == args.in1.nelems) {
      r = rsqrt_grad_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.in0.nelems);
@@ -1073,6 +1115,11 @@ int op_Div(const void* args, size_t len)
 int op_DivNoNan(const void* args, size_t len)
 {
   return op_Binary(args, len, op_divnonan, "op_DivNoNan");
+}
+
+int op_Pow(const void* args, size_t len)
+{
+  return op_Binary(args, len, op_pow, "op_Pow");
 }
 
 int op_SquaredDifference(const void* args, size_t len)
