@@ -395,3 +395,192 @@ int op_tile(const VEOpArgs& args)
 } // namespace
 
 DEFINE_KERNEL(Tile, op_tile);
+
+
+//
+// SoftmaxXentWithLogits
+//
+
+template<typename T>
+int softmax_xent_with_logits_same_shape(
+  int64_t logits_addr,
+  int64_t labels_addr,
+  int64_t scratch_addr,
+  int64_t loss_addr,
+  int64_t back_addr,
+  size_t batch_size,
+  size_t num_classes )
+{
+  T* logits  = reinterpret_cast<T*>(logits_addr);
+  T* labels  = reinterpret_cast<T*>(labels_addr);
+  T* scratch = reinterpret_cast<T*>(scratch_addr);
+  T* loss    = reinterpret_cast<T*>(loss_addr);
+  T* back    = reinterpret_cast<T*>(back_addr);
+
+#if 1 /* optimized version */
+  for(int64_t i=0; i<batch_size; i++) {
+    T max_logits = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      if(max_logits < logits[i*num_classes+j]) max_logits = logits[i*num_classes+j] ;
+    }
+
+    T sum_exp_logits = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      const T logit = logits[i*num_classes+j] - max_logits;
+      sum_exp_logits += std::exp(logit) ;
+      back[i*num_classes+j] = logit ;
+    }
+
+    T l = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      const T logit = back[i*num_classes+j] ;
+      const T label = labels[i*num_classes+j] ;
+
+      l += label * (std::log(sum_exp_logits) - logit);
+      back[i*num_classes+j] = std::exp(logit) / sum_exp_logits - label ;
+    }
+    loss[i] = l ;
+  }
+#else /* original version */
+  // max_logits along classes.
+  for(int64_t i=0; i<batch_size; i++) {
+    T max_logits = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      if(max_logits < logits[i*num_classes+j]) max_logits = logits[i*num_classes+j] ;
+    }
+    scratch[i] = max_logits ;
+  }
+
+  // logits - max_logits.
+  for(int64_t i=0; i<batch_size; i++) {
+    const T max_logits = scratch[i] ;
+    for(int64_t j=0; j<num_classes; j++) {
+      back[i*num_classes+j] = logits[i*num_classes+j] - max_logits;
+    }
+  }
+
+  // sum(exp(logits - max_logits)) along classes.
+  for(int64_t i=0; i<batch_size; i++) {
+    T sum_exp_logits = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      sum_exp_logits += std::exp(back[i*num_classes+j]) ;
+    }
+    scratch[i] = sum_exp_logits ;
+  }
+
+
+  //  sum(-labels *
+  //     ((logits - max_logits) - log(sum(exp(logits - max_logits)))))
+  //  along classes
+  for(int64_t i=0; i<batch_size; i++) {
+    const T sum_exp_logits = scratch[i] ;
+    T l = T(0.) ;
+    for(int64_t j=0; j<num_classes; j++) {
+      l += labels[i*num_classes+j] * (std::log(sum_exp_logits) - back[i*num_classes+j]);
+    }
+    loss[i] = l ;
+  }
+
+  // backprop: prob - labels, where
+  //   prob = exp(logits - max_logits) / sum(exp(logits - max_logits))
+  for(int64_t i=0; i<batch_size; i++) {
+    const T sum_exp_logits = scratch[i] ;
+    for(int64_t j=0; j<num_classes; j++) {
+      back[i*num_classes+j] = std::exp(back[i*num_classes+j]) / sum_exp_logits - labels[i*num_classes+j] ;
+    }
+  }
+#endif
+
+  return 0 ;
+}
+
+#if 1	// for ncc 2.X.X
+template<>
+int softmax_xent_with_logits_same_shape<float>(
+  int64_t logits_addr,
+  int64_t labels_addr,
+  int64_t scratch_addr,
+  int64_t loss_addr,
+  int64_t back_addr,
+  size_t batch_size,
+  size_t num_classes )
+{
+  float* logits  = reinterpret_cast<float*>(logits_addr);
+  float* labels  = reinterpret_cast<float*>(labels_addr);
+//  float* scratch = reinterpret_cast<float*>(scratch_addr);
+  float* loss    = reinterpret_cast<float*>(loss_addr);
+  float* back    = reinterpret_cast<float*>(back_addr);
+
+  for(int64_t i=0; i<batch_size; i++) {
+    float max_logits = 0.f ;
+    for(int64_t j=0; j<num_classes; j++) {
+      if(max_logits < logits[i*num_classes+j]) max_logits = logits[i*num_classes+j] ;
+    }
+
+    float sum_exp_logits = 0.f ;
+    for(int64_t j=0; j<num_classes; j++) {
+      const float logit = logits[i*num_classes+j] - max_logits;
+      sum_exp_logits += __builtin_expf(logit) ;
+      back[i*num_classes+j] = logit ;
+    }
+
+    float l = 0.f ;
+    for(int64_t j=0; j<num_classes; j++) {
+      const float logit = back[i*num_classes+j] ;
+      const float label = labels[i*num_classes+j] ;
+
+      l += label * (__builtin_logf(sum_exp_logits) - logit);
+      back[i*num_classes+j] = __builtin_expf(logit) / sum_exp_logits - label ;
+    }
+    loss[i] = l ;
+  }
+
+  return 0 ;
+}
+#endif
+
+namespace {
+int op_softmax_xent_with_logits(const VEOpArgs& args)
+{
+  if (args.nTensors() != 5)
+    return 5;
+
+  const Tensor* logits_in = args.tensor(0);
+  const Tensor* labels_in = args.tensor(1);
+  const Tensor* scratch = args.tensor(2);
+  const Tensor* loss_out = args.tensor(3);
+  const Tensor* back_out = args.tensor(4);
+
+
+  LOG(3) << __FUNCTION__
+    << " logits_in=" << logits_in->to_s()
+    << " labels_in=" << labels_in->to_s()
+    << " scratch="   << scratch->to_s()
+    << " loss_out="  << loss_out->to_s()
+    << " back_out="  << back_out->to_s() ;
+
+  if ( logits_in->dtype == DT_FLOAT
+      && labels_in->dtype == DT_FLOAT
+      && scratch->dtype == DT_FLOAT
+      && loss_out->dtype == DT_FLOAT
+      && back_out->dtype == DT_FLOAT ) {
+
+    int r=1;
+
+    // TODO : add other patterns (ex:n1,1n)
+    if (logits_in->dims == 2 && labels_in->dims == 2
+	&& logits_in->dim_size[0] == labels_in->dim_size[0]
+        && logits_in->dim_size[1] == labels_in->dim_size[1] ) {
+      r = softmax_xent_with_logits_same_shape<float>(
+   	    logits_in->addr, labels_in->addr,
+	    scratch->addr, loss_out->addr, back_out->addr,
+	    logits_in->dim_size[0], labels_in->dim_size[1] ) ;
+    }
+
+    return r;
+  }
+  return 1;
+}
+} // namespace
+
+DEFINE_KERNEL(SoftmaxXentWithLogits, op_softmax_xent_with_logits);
