@@ -87,7 +87,7 @@ int mul_n1_f32(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 		for (size_t i = 0; i < n; i++)
 			po[i] = pi0[i] * i1;
 
-	}else if(n<VLEN){
+	}else { // 17 <= n <= VLEN
 		_ve_lvl(n);
 		__vr vr_pin = _ve_vldu_vss(4,pi0);
 		__vr vr_mul = _ve_vfmuls_vsv(i1, vr_pin);
