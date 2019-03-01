@@ -630,6 +630,19 @@ int div_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
   return 0;
 }
 
+template <typename T>
+int div_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < nelems; ++i) {
+    po[i] = pi0[i] / pi1[i];
+  }
+  return 0;
+}
+
 #ifdef LIBVETF_INTRINSIC
 template <>
 inline int div_n1<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
@@ -671,6 +684,13 @@ inline int div2_nn_n1<float>(uint64_t out,
 #endif
 
 int op_div(const BinaryOpArgs& args) {
+
+//  printf("args.in0.dims = %ld\n", args.in0.dims) ;
+//  for(int i=0; i<args.in0.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in0.dim_size[i]) ;
+//  printf("args.in1.dims = %ld\n", args.in1.dims) ;
+//  for(int i=0; i<args.in1.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in1.dim_size[i]) ;
+
+
   if (CheckTypesAll(args, DT_FLOAT)) {
 
     int r=1;
@@ -683,6 +703,9 @@ int op_div(const BinaryOpArgs& args) {
     } else if (args.in1.nelems == 1) {
       r = div_n1<float>(args.out.addr, args.in0.addr, args.in1.addr,
                            args.out.nelems);
+    } else if (args.in0.nelems == args.in1.nelems ) {
+      r = div_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                        args.out.nelems);
     } else if (args.in0.dims == 2
                && args.in1.dims == 2
                && args.in0.dim_size[0] == args.in1.dim_size[0]
