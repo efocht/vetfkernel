@@ -11,6 +11,7 @@
 
 #include "libvetfkernel.h"
 
+REGISTER_KERNEL("ApplyGradientDescent", "op_ApplyGradientDescent");
 REGISTER_KERNEL("ApplyAdam", "op_ApplyAdam");
 
 #define CHECK_ARG_LEN(l0, l1) \
@@ -20,7 +21,63 @@ REGISTER_KERNEL("ApplyAdam", "op_ApplyAdam");
   }
 
 extern "C" {
+  int op_ApplyGradientDescent(const void *arg, size_t len) ;
   int op_ApplyAdam(const void* arg, size_t len);
+}
+
+//
+// ApplyGradientDescent
+//
+
+namespace {
+
+template <typename T>
+int apply_gradient_descent(int64_t num_elements,
+                           uint64_t var_ptr, uint64_t delta_ptr,
+			   uint64_t alpha_ptr )
+{
+  T* var = reinterpret_cast<T*>(var_ptr);
+  const T* delta  = reinterpret_cast<const T*>(delta_ptr);
+  const T  alpha = *reinterpret_cast<T*>(alpha_ptr);
+
+  for(int64_t i=0; i<num_elements; i++) {
+    var[i] -= alpha * delta[i] ;
+  }
+
+  return 0 ;
+}
+
+}
+
+int op_ApplyGradientDescent(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct Args {
+    int dtype;
+    int64_t num_elements ;
+    uint64_t var_ptr, delta_ptr ;
+    uint64_t alpha_ptr ;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  int ret = 1;
+
+  if (p->dtype == DT_FLOAT) {
+    ret = apply_gradient_descent<float> (p->num_elements,
+	                                 p->var_ptr, p->delta_ptr,
+					 p->alpha_ptr) ;
+  }
+  else if (p->dtype == DT_DOUBLE) {
+    ret = apply_gradient_descent<double>(p->num_elements,
+	                                 p->var_ptr, p->delta_ptr,
+					 p->alpha_ptr) ;
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+  return ret;
 }
 
 
