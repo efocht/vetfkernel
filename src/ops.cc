@@ -63,6 +63,7 @@ REGISTER_KERNEL("Square", "op_Square");
 REGISTER_KERNEL("Floor", "op_Floor");
 REGISTER_KERNEL("Reciprocal", "op_Reciprocal");
 REGISTER_KERNEL("Log", "op_Log");
+REGISTER_KERNEL("Exp", "op_Exp");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -90,6 +91,7 @@ extern "C" {
   int op_Pack(const void* arg, size_t len);
   int op_Reciprocal(const void* arg, size_t len);
   int op_Log(const void* arg, size_t len);
+  int op_Exp(const void* arg, size_t len);
   int op_Concat(const void* arg, size_t len);
   int op_Slice(const void* arg, size_t len);
 }
@@ -778,6 +780,68 @@ int op_Log(const void* args, size_t len)
 
   if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
     op_log<float, float>(p->out.addr, p->in.addr, p->in.nelems);
+  } else {
+    return 1;
+  }
+
+  LOG(2) << __FUNCTION__ << " end";
+  return 0;
+}
+
+
+//
+// Exp
+//
+
+namespace {
+template<typename Tin, typename Tout>
+  void op_exp(uint64_t out, uint64_t in, size_t nelems)
+  {
+    Tout* po = reinterpret_cast<Tout*>(out);
+    const Tin* pi = reinterpret_cast<Tin*>(in);
+
+    for (int64_t i = 0; i < nelems; ++i) {
+      po[i] = std::exp(pi[i]) ;
+    }
+  }
+
+#if defined(__NEC_VERSION__) && (__NEC_VERSION__ >= 20000) // current compiler (2.1.21) does not vectorize std::exp, expf
+template<>
+  void op_exp<float,float>(uint64_t out, uint64_t in, size_t nelems)
+  {
+    float* po = reinterpret_cast<float*>(out);
+    const float* pi = reinterpret_cast<float*>(in);
+
+    for (int64_t i = 0; i < nelems; ++i) {
+      po[i] = __builtin_expf(pi[i]) ;
+    }
+  }
+#endif
+}
+
+int op_Exp(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct _Tensor {
+    int dtype;
+    int data_format;
+    uint64_t addr;
+    int32_t dims;
+    int64_t nelems;
+    int64_t dim_size[8];
+  };
+
+  struct Args {
+    _Tensor in;
+    _Tensor out;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
+    op_exp<float, float>(p->out.addr, p->in.addr, p->in.nelems);
   } else {
     return 1;
   }
