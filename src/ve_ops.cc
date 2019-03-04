@@ -26,74 +26,48 @@ int op_select_nn(uint64_t out,
 
 int op_select(const VEOpArgs& args)
 {
-#if 0
   //fprintf(stderr, "%s: ninputs=%d noutputs=%d\n", __FUNCTION__, args.ninputs(), args.noutputs());
-  if (args.ninputs() != 3 && args.noutputs() != 1)
+  if (args.nVariables() != 4)
     return 1;
 
+  const Tensor *t0 = args.arg<Tensor>(0) ;
+  const Tensor *t1 = args.arg<Tensor>(1) ;
+  const Tensor *t2 = args.arg<Tensor>(2) ;
+  const Tensor *t3 = args.arg<Tensor>(3) ;
+
 #if 0
-  fprintf(stderr, "%s: input(0).dtype=%d\n", __FUNCTION__, args.input(0).dtype);
-  fprintf(stderr, "%s: input(1).dtype=%d\n", __FUNCTION__, args.input(1).dtype);
-  fprintf(stderr, "%s: input(2).dtype=%d\n", __FUNCTION__, args.input(2).dtype);
-  fprintf(stderr, "%s: output(0).dtype=%d\n", __FUNCTION__, args.output(0).dtype);
+  fprintf(stderr, "%s: input(0).dtype=%d\n", __FUNCTION__, t0->dtype);
+  fprintf(stderr, "%s: input(1).dtype=%d\n", __FUNCTION__, t1->dtype);
+  fprintf(stderr, "%s: input(2).dtype=%d\n", __FUNCTION__, t2->dtype);
+  fprintf(stderr, "%s: output(0).dtype=%d\n", __FUNCTION__, t3->dtype);
 #endif
 
-  if (args.input(0).dtype == DT_BOOL
-      && args.input(1).dtype == DT_FLOAT
-      && args.input(2).dtype == DT_FLOAT
-      && args.output(0).dtype == DT_FLOAT) {
-    if (args.input(0).nelems == args.input(1).nelems
-        && args.input(0).nelems == args.input(2).nelems) {
-      return op_select_nn<float>(args.output(0).addr,
-                                 args.input(0).addr,
-                                 args.input(1).addr,
-                                 args.input(2).addr,
-                                 args.input(0).nelems);
+  if (t0->dtype == DT_BOOL
+      && t1->dtype == DT_FLOAT
+      && t2->dtype == DT_FLOAT
+      && t3->dtype == DT_FLOAT) {
+    if (t0->nelems == t1->nelems
+        && t0->nelems == t2->nelems) {
+      return op_select_nn<float>(t3->addr,
+                                 t0->addr,
+                                 t1->addr,
+                                 t2->addr,
+                                 t0->nelems);
     }
   }
 
 #if 0
   fprintf(stderr, "%s: return 1\n", __FUNCTION__);
-#endif
-#else
-  //fprintf(stderr, "%s: ninputs=%d noutputs=%d\n", __FUNCTION__, args.ninputs(), args.noutputs());
-  if (args.nTensors() != 4)
-    return 1;
-
-#if 0
-  fprintf(stderr, "%s: input(0).dtype=%d\n", __FUNCTION__, args.input(0).dtype);
-  fprintf(stderr, "%s: input(1).dtype=%d\n", __FUNCTION__, args.input(1).dtype);
-  fprintf(stderr, "%s: input(2).dtype=%d\n", __FUNCTION__, args.input(2).dtype);
-  fprintf(stderr, "%s: output(0).dtype=%d\n", __FUNCTION__, args.output(0).dtype);
-#endif
-
-  if (args.tensor(0)->dtype == DT_BOOL
-      && args.tensor(1)->dtype == DT_FLOAT
-      && args.tensor(2)->dtype == DT_FLOAT
-      && args.tensor(3)->dtype == DT_FLOAT) {
-    if (args.tensor(0)->nelems == args.tensor(1)->nelems
-        && args.tensor(0)->nelems == args.tensor(2)->nelems) {
-      return op_select_nn<float>(args.tensor(3)->addr,
-                                 args.tensor(0)->addr,
-                                 args.tensor(1)->addr,
-                                 args.tensor(2)->addr,
-                                 args.tensor(0)->nelems);
-    }
-  }
-
-#if 0
-  fprintf(stderr, "%s: return 1\n", __FUNCTION__);
-#endif
 #endif
   return 1;
 }
 
 int op_randomUniform(const VEOpArgs& args)
 {
-  if (args.nTensors() != 1)
+  if (args.nVariables() != 1)
     return 1;
 
-  const Tensor* t = args.tensor(0);
+  const Tensor* t = args.arg<Tensor>(0);
 
   LOG(3) << "op_RandomUniform: nelems=" << t->nelems;
 
@@ -169,10 +143,10 @@ template <typename TO>
 
 int op_cast(const VEOpArgs& args)
 {
-  if (args.nTensors() != 2)
+  if (args.nVariables() != 2)
     return 1;
-  const Tensor* ti = args.tensor(0);
-  const Tensor* to = args.tensor(1);
+  const Tensor* ti = args.arg<Tensor>(0);
+  const Tensor* to = args.arg<Tensor>(1);
 
   LOG(3) << __FUNCTION__ << " ti=" << ti << " to=" << to;
 
@@ -212,10 +186,10 @@ DEFINE_KERNEL(Cast, op_cast);
 namespace {
 int op_tile(const VEOpArgs& args)
 {
-  if (args.nTensors() != 2)
+  if (args.nVariables() != 2)
     return 1;
-  const Tensor* ti = args.tensor(0);
-  const Tensor* to = args.tensor(1);
+  const Tensor* ti = args.arg<Tensor>(0);
+  const Tensor* to = args.arg<Tensor>(1);
 
   LOG(3) << __FUNCTION__ 
     << " ti=" << ti->to_s()
@@ -407,15 +381,14 @@ int softmax_xent_with_logits_same_shape<float>(
 namespace {
 int op_softmax_xent_with_logits(const VEOpArgs& args)
 {
-  if (args.nTensors() != 5)
+  if (args.nVariables() != 5)
     return 5;
 
-  const Tensor* logits_in = args.tensor(0);
-  const Tensor* labels_in = args.tensor(1);
-  const Tensor* scratch = args.tensor(2);
-  const Tensor* loss_out = args.tensor(3);
-  const Tensor* back_out = args.tensor(4);
-
+  const Tensor* logits_in = args.arg<Tensor>(0);
+  const Tensor* labels_in = args.arg<Tensor>(1);
+  const Tensor* scratch = args.arg<Tensor>(2);
+  const Tensor* loss_out = args.arg<Tensor>(3);
+  const Tensor* back_out = args.arg<Tensor>(4);
 
   LOG(3) << __FUNCTION__
     << " logits_in=" << logits_in->to_s()

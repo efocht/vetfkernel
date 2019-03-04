@@ -47,16 +47,15 @@ struct Tensor {
 class VEOpArgs  {
   public:
     VEOpArgs(const void* buf) : buf_(buf) {
-      //pHeader_ = reinterpret_cast<const Header*>(buf);
-      pHeader2_ = reinterpret_cast<const Header2*>(buf);
-      pTensor_ = reinterpret_cast<uintptr_t>(buf) + sizeof(Header2);
+      pHeader_ = reinterpret_cast<const Header*>(buf);
+      pVariable_ = reinterpret_cast<uintptr_t>(buf) + sizeof(Header);
 
 #if 0
       fprintf(stderr, "%s: buf=%p pHeader_=%p pTensor_=%p (%d)\n", __FUNCTION__,
               buf, pHeader_, pTensor_, pTensor_ - reinterpret_cast<uintptr_t>(pHeader_));
 #endif
 
-      const int* p = reinterpret_cast<const int*>(pTensor_);
+      const int* p = reinterpret_cast<const int*>(pVariable_);
 #if 0
       fprintf(stderr, "*p=%d\n", *p);
 #endif
@@ -66,43 +65,25 @@ class VEOpArgs  {
 #endif
     }
 
-    int64_t nTensors() const { return pHeader2_->nTensors; }
+    int64_t nVariables() const { return pHeader_->nVariables; }
 
-    const Tensor* tensor(int i) const {
-      uintptr_t p = pTensor_;
-      //const Tensor* p = reinterpret_cast<const Tensor*>(pTensor_);
+    template<typename T>
+    const T* arg(int i) const {
+      uintptr_t p = pVariable_;
       for (int j = 0; j < i; ++j) {
-        const Tensor* t = reinterpret_cast<const Tensor*>(p);
-        p += t->size();
+        const size_t size  = *reinterpret_cast<size_t*>(p);
+        p += sizeof(size_t) + size;
       }
-      return reinterpret_cast<const Tensor*>(p);
-    }
-
-    int max_dim_size() const { return pHeader_->max_dim_size; }
-    int ninputs() const { return pHeader_->ninputs; }
-    int noutputs() const { return pHeader_->noutputs; }
-
-    const Tensor& input(int i) const {
-      return *reinterpret_cast<const Tensor*>(pTensor_ + tensor_size_ * i);
-    }
-
-    const Tensor& output(int i) const {
-      return *reinterpret_cast<const Tensor*>(pTensor_ + tensor_size_ * (pHeader_->ninputs + i));
+      return reinterpret_cast<const T*>(p+sizeof(size_t));
     }
 
   private:
     const void* buf_;
-    uintptr_t pTensor_;
-    struct Header2 {
-      int64_t nTensors;
-    };
+    uintptr_t pVariable_;
     struct Header {
-      int max_dim_size;
-      int ninputs;
-      int noutputs;
+      int64_t nVariables;
     };
     const Header* pHeader_;
-    const Header2* pHeader2_;
 
     size_t tensor_size_;
 };
@@ -116,7 +97,7 @@ int op_Kernel(const void* args, size_t len,
 
   VEOpArgs tmp(args);
 
-  LOG(2) << name << ": nTensor=" << tmp.nTensors();
+  LOG(2) << name << ": nVariable=" << tmp.nVariables();
 
   // TODO: check length
 
