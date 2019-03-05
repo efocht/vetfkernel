@@ -333,51 +333,6 @@ int softmax_xent_with_logits_same_shape(
   return 0 ;
 }
 
-#if 1	// for ncc 2.X.X
-template<>
-int softmax_xent_with_logits_same_shape<float>(
-  int64_t logits_addr,
-  int64_t labels_addr,
-  int64_t scratch_addr,
-  int64_t loss_addr,
-  int64_t back_addr,
-  size_t batch_size,
-  size_t num_classes )
-{
-  float* logits  = reinterpret_cast<float*>(logits_addr);
-  float* labels  = reinterpret_cast<float*>(labels_addr);
-//  float* scratch = reinterpret_cast<float*>(scratch_addr);
-  float* loss    = reinterpret_cast<float*>(loss_addr);
-  float* back    = reinterpret_cast<float*>(back_addr);
-
-  for(int64_t i=0; i<batch_size; i++) {
-    float max_logits = 0.f ;
-    for(int64_t j=0; j<num_classes; j++) {
-      if(max_logits < logits[i*num_classes+j]) max_logits = logits[i*num_classes+j] ;
-    }
-
-    float sum_exp_logits = 0.f ;
-    for(int64_t j=0; j<num_classes; j++) {
-      const float logit = logits[i*num_classes+j] - max_logits;
-      sum_exp_logits += __builtin_expf(logit) ;
-      back[i*num_classes+j] = logit ;
-    }
-
-    float l = 0.f ;
-    for(int64_t j=0; j<num_classes; j++) {
-      const float logit = back[i*num_classes+j] ;
-      const float label = labels[i*num_classes+j] ;
-
-      l += label * (__builtin_logf(sum_exp_logits) - logit);
-      back[i*num_classes+j] = __builtin_expf(logit) / sum_exp_logits - label ;
-    }
-    loss[i] = l ;
-  }
-
-  return 0 ;
-}
-#endif
-
 namespace {
 int op_softmax_xent_with_logits(const VEOpArgs& args)
 {
