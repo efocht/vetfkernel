@@ -12,6 +12,14 @@
 
 #define MAX_KERNEL 1024
 
+#define USE_DMA
+#ifdef USE_DMA
+extern "C" {
+#include <vhshm.h>
+#include <vedma.h>
+}
+#endif
+
 class InitVETFKernel
 {
 public :
@@ -44,6 +52,11 @@ extern "C" {
     uint64_t vetfkl_entry(const void* arg, size_t len);
     uint64_t vetfkl_entry_prof(const void* argIn, size_t lenIn, void* argOut, size_t lenOut);
     int vetfkl_get_timestamp(void* arg, size_t len);
+
+#ifdef USE_DMA
+    int vetfkl_init_dma(void* arg, size_t len);
+    int vetfkl_write_mem(void* arg, size_t len);
+#endif
 
     int op_Assign(const void* arg, size_t len);
 }
@@ -179,6 +192,104 @@ int vetfkl_get_timestamp(void* arg, size_t len)
 #endif
 #endif
 }
+
+#ifdef USE_DMA
+void* vemva_ = NULL;
+void* vehva_vh_;
+uint64_t vehva_ve_;
+
+int init_dma(int32_t shmid, size_t size)
+{
+    LOG(1) << "init_dma: shmid=" << shmid << " size=" << size;
+
+    ve_dma_init();
+
+    size_t align = 64 * 1024 * 1024;
+    if (posix_memalign(&vemva_, align, size) != 0) {
+        fprintf(stderr, "posix_memalign failed\n");
+        return 1;
+    }
+    LOG(2) << "init_dma: vemva=" << vemva_;
+    vehva_ve_ = ve_register_mem_to_dmaatb(vemva_, size);
+    LOG(2) << "init_dma: vehva_ve_=" << (void*)vehva_ve_;
+    if (vehva_ve_ == (uint64_t)-1) {
+        fprintf(stderr, "ve_register_mem_to_dmaatb failed\n");
+        return 1;
+    }
+
+    void* tmp = vh_shmat(shmid, NULL, 0, &vehva_vh_);
+    if (tmp == (void*)-1) {
+        perror("vh_shmget");
+        return 1;
+    }
+
+    // TODO: vh_shmdt
+
+    return 0;
+}
+
+int vetfkl_init_dma(void* arg, size_t len)
+{
+    struct tmp {
+        int32_t shmid;
+        uint64_t size;
+    }* p = reinterpret_cast<tmp*>(arg);
+
+    return init_dma(p->shmid, p->size);
+}
+
+int vetfkl_write_mem(void* arg, size_t len)
+{
+    struct tmp {
+        uint64_t size;
+        uint64_t vevma;
+    }* p = reinterpret_cast<tmp*>(arg);
+
+    // TODO: 
+    // 1. DMA to pre-allocated buffer, then memcpy to destination address.
+    // 2. register destination address, and DMA, and unregister. 
+    //    (Address have to be 64b aligned. Difficult condition)
+    // Currently 1 is used. which is faster?
+
+#if 0
+    fprintf(stderr, "%16llu %s: size=%lu vevma=%x (vehva_ve_=%p)\n",
+            __veperf_get_stm(), __FUNCTION__, p->size, p->vevma, vehva_ve_);
+#endif
+
+#if 1 // method 1
+    int ret = ve_dma_post_wait(vehva_ve_, (uint64_t)vehva_vh_, p->size);
+#if 0
+    fprintf(stderr, "%16llu %s: size=%lu ret=%d\n", __veperf_get_stm(), __FUNCTION__, p->size, ret);
+#endif
+
+    if (ret != 0)
+        return 1;
+
+#if 0
+    fprintf(stderr, "%16llu %s: call memcpy\n", __veperf_get_stm(), __FUNCTION__);
+#endif
+
+    memcpy(reinterpret_cast<void*>(p->vevma), (void const*)vemva_, p->size);
+
+#else // method 2
+    uint64_t vehva_ve = ve_register_mem_to_dmaatb((void*)p->vevma, p->size);
+    if (vehva_ve == (uint64_t)-1)
+        return 1;
+
+    int ret = ve_dma_post_wait(vehva_ve, (uint64_t)vehva_vh_, p->size);
+#if 1
+    fprintf(stderr, "%16llu %s: size=%lu ret=%d\n", __veperf_get_stm(), __FUNCTION__, p->size, ret);
+#endif
+
+    ve_unregister_mem_from_dmaatb(vehva_ve);
+#endif
+
+#if 0
+    fprintf(stderr, "%16llu %s: done\n", __veperf_get_stm(), __FUNCTION__);
+#endif
+    return 0;
+}
+#endif
 
 uint64_t vetfkl_entry_prof(const void* argIn, size_t lenIn, 
                            void* argOut, size_t lenOut)
