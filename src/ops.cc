@@ -206,32 +206,31 @@ namespace {
 template <typename T>
 void AddNOp(T* out, T** in, size_t num_elems, size_t num_inputs)
 {
-#if 0
-  for (size_t j = 0; j < num_inputs; ++j) {
-    std::cerr << __FUNCTION__ << ": in[" << j << "]=" << in[j] << std::endl;
+  switch( num_inputs ) {
+  case 0 :
+     memset(out, 0, sizeof(T) * num_elems);
+     break ;
+  case 1 :
+     for (size_t i = 0; i < num_elems; ++i) {
+       out[i] = in[0][i];
+     }
+     break ;
+  case 2 :
+     for (size_t i = 0; i < num_elems; ++i) {
+       out[i] = in[0][i] + in[1][i] ;
+     }
+     break ;
+  default :
+     for (size_t i = 0; i < num_elems; ++i) {
+       out[i] = in[0][i];
+     }
+     for (size_t j = 1; j < num_inputs; ++j) {
+       for (size_t i = 0; i < num_elems; ++i) {
+         out[i] += in[j][i];
+       }
+     }
+     break ;
   }
-#endif
-
-#if 1
-  memset(out, 0, sizeof(T) * num_elems);
-  for (size_t j = 0; j < num_inputs; ++j) {
-    for (size_t i = 0; i < num_elems; ++i) {
-      out[i] += in[j][i];
-    }
-  }
-
-#else
-  for (size_t i = 0; i < num_elems; ++i) {
-    T s = 0;
-    for (size_t j = 0; j < num_inputs; ++j) {
-#if 0
-      std::cerr << __FUNCTION__ << " in[" << j << "][" << i << "]=" << in[j][i] << std::endl;
-#endif
-      s += in[j][i];
-    }
-    out[i] = s;
-  }
-#endif
 }
 };
 
