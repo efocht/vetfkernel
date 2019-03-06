@@ -194,7 +194,7 @@ int vetfkl_get_timestamp(void* arg, size_t len)
 }
 
 #ifdef USE_DMA
-void* vemva_ = NULL;
+void* vemva_ = NULL; // FIXME: rename
 void* vehva_vh_;
 uint64_t vehva_ve_;
 
@@ -240,6 +240,7 @@ int vetfkl_init_dma(void* arg, size_t len)
 
 int vetfkl_write_mem(void* arg, size_t len)
 {
+    LOG(1) << __FUNCTION__;
     struct tmp {
         uint64_t size;
         uint64_t vevma;
@@ -256,33 +257,29 @@ int vetfkl_write_mem(void* arg, size_t len)
             __veperf_get_stm(), __FUNCTION__, p->size, p->vevma, vehva_ve_);
 #endif
 
-#if 1 // method 1
-    int ret = ve_dma_post_wait(vehva_ve_, (uint64_t)vehva_vh_, p->size);
-#if 0
-    fprintf(stderr, "%16llu %s: size=%lu ret=%d\n", __veperf_get_stm(), __FUNCTION__, p->size, ret);
-#endif
+    const size_t max_dma_size = 64 * 1024 * 1024; // have to be less than 128MB
 
-    if (ret != 0)
-        return 1;
+    uint64_t dst_hva = vehva_ve_;
+    uint64_t src_hva = reinterpret_cast<uint64_t>(vehva_vh_);
+    uint64_t dst = reinterpret_cast<uint64_t>(p->vevma);
+    uint64_t src = reinterpret_cast<uint64_t>(vemva_);
+    size_t size = p->size;
 
-#if 0
-    fprintf(stderr, "%16llu %s: call memcpy\n", __veperf_get_stm(), __FUNCTION__);
-#endif
+    while (size > 0) {
+        size_t l = size > max_dma_size ? max_dma_size : size;
+        LOG(2) << __FUNCTION__ << ": call ve_dma_post_wait. transfer size is " << l << " bytes";
+        int ret = ve_dma_post_wait(dst_hva, src_hva, l);
+        if (ret != 0)
+            return 1;
+        memcpy(reinterpret_cast<void*>(dst),
+               reinterpret_cast<void const*>(src), l);
 
-    memcpy(reinterpret_cast<void*>(p->vevma), (void const*)vemva_, p->size);
-
-#else // method 2
-    uint64_t vehva_ve = ve_register_mem_to_dmaatb((void*)p->vevma, p->size);
-    if (vehva_ve == (uint64_t)-1)
-        return 1;
-
-    int ret = ve_dma_post_wait(vehva_ve, (uint64_t)vehva_vh_, p->size);
-#if 1
-    fprintf(stderr, "%16llu %s: size=%lu ret=%d\n", __veperf_get_stm(), __FUNCTION__, p->size, ret);
-#endif
-
-    ve_unregister_mem_from_dmaatb(vehva_ve);
-#endif
+        dst_hva += l;
+        src_hva += l;
+        dst += l;
+        src += l;
+        size -= l;
+    }
 
 #if 0
     fprintf(stderr, "%16llu %s: done\n", __veperf_get_stm(), __FUNCTION__);
