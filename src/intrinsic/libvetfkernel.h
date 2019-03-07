@@ -6,8 +6,8 @@
 extern "C" {
 #endif
 
-int BiasAdd_NHWC(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel);
-int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel);
+int BiasAdd_NHWC_f32(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel);
+int BiasAdd_NCHW_f32(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel);
 
 int BiasAddGrad_NHWC(uint64_t output, uint64_t output_backprop, int batch, int width, int height, int channel);
 int BiasAddGrad_NCHW(uint64_t output, uint64_t output_backprop, int batch, int width, int height, int channel);

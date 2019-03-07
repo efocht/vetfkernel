@@ -263,7 +263,7 @@ int op_AddN(const void* args, size_t len)
 
   return 0;
 }
-#ifndef LIBVETF_INTRINSIC
+
 namespace {
 
 template<typename T>
@@ -293,6 +293,14 @@ int BiasAdd_NHWC(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
   return 0;
 }
 
+#ifdef LIBVETF_INTRINSIC
+template<>
+inline int BiasAdd_NHWC<float>(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel)
+{
+  BiasAdd_NHWC_f32(out, in, bias, batch, width, height, channel) ;
+}
+#endif
+
 template<typename T>
 int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel)
 {
@@ -317,8 +325,15 @@ int BiasAdd_NCHW(uint64_t out, uint64_t in, uint64_t bias, int batch, int width,
   return 0;
 }
 
-};
+#ifdef LIBVETF_INTRINSIC
+template<>
+inline int BiasAdd_NCHW<float>(uint64_t out, uint64_t in, uint64_t bias, int batch, int width, int height, int channel)
+{
+  BiasAdd_NCHW_f32(out, in, bias, batch, width, height, channel) ;
+}
 #endif
+};
+
 int op_BiasAdd(const void* args, size_t len)
 {
   LOG(1) << __FUNCTION__;
@@ -338,47 +353,53 @@ int op_BiasAdd(const void* args, size_t len)
 
   p = reinterpret_cast<const Args*>(args);
 
-#if 0
-  fprintf(stderr, "%s dtype=%d data_format=%d batch=%d width=%d height=%d channel=%d\n", 
-          __FUNCTION__, p->dtype, p->data_format, p->batch, p->width, p->height, p->channel);
-#endif
   int r=0;
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
-#endif
 
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
-#ifndef LIBVETF_INTRINSIC
-    r = BiasAdd_NHWC<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-#else
-    r = BiasAdd_NHWC(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-#endif
-#ifdef SET_TIMER
-  unsigned long long end = __veperf_get_stm();
-  printf("add hwc, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
-#endif
-  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
-#ifndef LIBVETF_INTRINSIC
-    r = BiasAdd_NCHW<float>(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-#else
-    r = BiasAdd_NCHW(p->out, p->in, p->bias, p->batch, p->width, p->height, p->channel);
-#endif
-#ifdef SET_TIMER
-  unsigned long long end = __veperf_get_stm();
-  printf("add chw, nchw %d %d %d %d:%lfms\n",p->batch,p->channel,p->width, p->height,(end-start)/(800e3));
-#endif
+#pragma omp parallel reduction(|:r)
+    {
+      int64_t nthreads = omp_get_num_threads() ;
+      int64_t threadid = omp_get_thread_num() ;
 
+      int64_t chunkSize = p->batch / nthreads ;
+      int64_t remain    = p->batch % nthreads ;
+
+      int64_t chunkBegin = chunkSize * threadid + ( threadid < remain ? threadid : remain ) ;
+      int64_t myChunk    = chunkSize + ( threadid < remain ? 1 : 0 ) ;
+
+      int64_t offset    = chunkBegin * sizeof(float) *  p->width * p->height * p->channel ;
+
+      if( myChunk > 0 ) {
+	r |= BiasAdd_NHWC<float>(p->out+offset, p->in+offset, p->bias, myChunk, p->width, p->height, p->channel);
+      }
+      else {
+	r |= 0 ;
+      }
+    }
+  } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+#pragma omp parallel reduction(|:r)
+    {
+      int64_t nthreads = omp_get_num_threads() ;
+      int64_t threadid = omp_get_thread_num() ;
+
+      int64_t chunkSize = p->batch / nthreads ;
+      int64_t remain    = p->batch % nthreads ;
+
+      int64_t chunkBegin = chunkSize * threadid + ( threadid < remain ? threadid : remain ) ;
+      int64_t myChunk    = chunkSize + ( threadid < remain ? 1 : 0 ) ;
+
+      int64_t offset    = chunkBegin * sizeof(float) *  p->width * p->height * p->channel ;
+
+      if( myChunk > 0 ) {
+	r |= BiasAdd_NCHW<float>(p->out+offset, p->in+offset, p->bias, myChunk, p->width, p->height, p->channel);
+      }
+      else {
+	r |= 0 ;
+      }
+    }
   }
 
-
-
   return r;
-
-
-#if 0
-  fprintf(stderr, "%s done\n", __PRETTY_FUNCTION__);
-#endif
-  return 1;
 }
 
 #ifndef LIBVETF_INTRINSIC
