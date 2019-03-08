@@ -353,9 +353,10 @@ int op_BiasAdd(const void* args, size_t len)
 
   p = reinterpret_cast<const Args*>(args);
 
-  int r=0;
+  int r = 1 ;
 
   if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NHWC) {
+    r = 0 ;
 #pragma omp parallel reduction(|:r)
     {
       int64_t nthreads = omp_get_num_threads() ;
@@ -377,6 +378,7 @@ int op_BiasAdd(const void* args, size_t len)
       }
     }
   } else if (p->dtype == DT_FLOAT && p->data_format == FORMAT_NCHW) {
+    r = 0 ;
 #pragma omp parallel reduction(|:r)
     {
       int64_t nthreads = omp_get_num_threads() ;
