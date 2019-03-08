@@ -12,8 +12,8 @@ int BiasAdd_NCHW_f32(uint64_t out, uint64_t in, uint64_t bias, int batch, int wi
 int BiasAddGrad_NHWC(uint64_t output, uint64_t output_backprop, int batch, int width, int height, int channel);
 int BiasAddGrad_NCHW(uint64_t output, uint64_t output_backprop, int batch, int width, int height, int channel);
 
-int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size);
-int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size);
+int transpose4_0231_f32(uint64_t out, uint64_t in, const int32_t* dim_size);
+int transpose4_0312_f32(uint64_t out, uint64_t in, const int32_t* dim_size);
 
 
 

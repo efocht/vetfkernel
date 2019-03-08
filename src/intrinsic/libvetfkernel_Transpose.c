@@ -12,7 +12,7 @@
 
 
 
-int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size)
+int transpose4_0231_f32(uint64_t out, uint64_t in, const int32_t* dim_size)
 {
   float* po = (float*)(out);
   const float* pi = (float*)(in);
@@ -98,7 +98,7 @@ int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size)
   return 0;
 }
 
-int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size)
+int transpose4_0312_f32(uint64_t out, uint64_t in, const int32_t* dim_size)
 {
   float* po = (float*)(out);
   const float* pi = (float*)(in);

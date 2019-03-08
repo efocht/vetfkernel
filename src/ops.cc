@@ -849,66 +849,78 @@ int op_Exp(const void* args, size_t len)
 //
 // Transpose
 //
-#ifndef LIBVETF_INTRINSIC
 
 namespace {
 template<typename Tin, typename Tout = Tin>
-  int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size)
-  {
-    Tout* po = reinterpret_cast<Tout*>(out);
-    const Tin* pi = reinterpret_cast<Tin*>(in);
+int transpose4_0231(uint64_t out, uint64_t in, const int32_t* dim_size)
+{
+  Tout* po = reinterpret_cast<Tout*>(out);
+  const Tin* pi = reinterpret_cast<Tin*>(in);
 
-    uint64_t si2 = dim_size[3];
-    uint64_t si1 = si2 * dim_size[2];
-    uint64_t si0 = si1 * dim_size[1];
+  uint64_t si2 = dim_size[3];
+  uint64_t si1 = si2 * dim_size[2];
+  uint64_t si0 = si1 * dim_size[1];
 
-    uint64_t so2 = dim_size[1];
-    uint64_t so1 = so2 * dim_size[3];
-    uint64_t so0 = so1 * dim_size[2];
+  uint64_t so2 = dim_size[1];
+  uint64_t so1 = so2 * dim_size[3];
+  uint64_t so0 = so1 * dim_size[2];
 
-    for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-      for (int64_t i1 = 0; i1 < dim_size[2]; ++i1) {
-        for (int64_t i2 = 0; i2 < dim_size[3]; ++i2) {
-          for (int64_t i3 = 0; i3 < dim_size[1]; ++i3) {
-            po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
-              = pi[i0 * si0 + i1 * si2 + i2 + i3 * si1];
-          }
-        }
+  for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
+    for (int64_t i1 = 0; i1 < dim_size[2]; ++i1) {
+      for (int64_t i2 = 0; i2 < dim_size[3]; ++i2) {
+	for (int64_t i3 = 0; i3 < dim_size[1]; ++i3) {
+	  po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
+	    = pi[i0 * si0 + i1 * si2 + i2 + i3 * si1];
+	}
       }
     }
-
-    return 0;
   }
 
-template<typename Tin, typename Tout = Tin>
-  int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size)
-  {
-    Tout* po = reinterpret_cast<Tout*>(out);
-    const Tin* pi = reinterpret_cast<Tin*>(in);
+  return 0;
+}
 
-    uint64_t si2 = dim_size[3];
-    uint64_t si1 = si2 * dim_size[2];
-    uint64_t si0 = si1 * dim_size[1];
-
-    uint64_t so2 = dim_size[2];
-    uint64_t so1 = so2 * dim_size[1];
-    uint64_t so0 = so1 * dim_size[3];
-
-    for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
-      for (int64_t i1 = 0; i1 < dim_size[3]; ++i1) {
-        for (int64_t i2 = 0; i2 < dim_size[1]; ++i2) {
-          for (int64_t i3 = 0; i3 < dim_size[2]; ++i3) {
-            po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
-              = pi[i0 * si0 + i1 + i2 * si1 + i3 * si2];
-          }
-        }
-      }
-    }
-
-    return 0;
-  }
+#ifdef LIBVETF_INTRINSIC
+template<>
+inline  int transpose4_0231<float>(uint64_t out, uint64_t in, const int32_t* dim_size) {
+  return transpose4_0231_f32(out, in, dim_size) ;
 }
 #endif
+
+template<typename Tin, typename Tout = Tin>
+int transpose4_0312(uint64_t out, uint64_t in, const int32_t* dim_size)
+{
+  Tout* po = reinterpret_cast<Tout*>(out);
+  const Tin* pi = reinterpret_cast<Tin*>(in);
+
+  uint64_t si2 = dim_size[3];
+  uint64_t si1 = si2 * dim_size[2];
+  uint64_t si0 = si1 * dim_size[1];
+
+  uint64_t so2 = dim_size[2];
+  uint64_t so1 = so2 * dim_size[1];
+  uint64_t so0 = so1 * dim_size[3];
+
+  for (int64_t i0 = 0; i0 < dim_size[0]; ++i0) {
+    for (int64_t i1 = 0; i1 < dim_size[3]; ++i1) {
+      for (int64_t i2 = 0; i2 < dim_size[1]; ++i2) {
+	for (int64_t i3 = 0; i3 < dim_size[2]; ++i3) {
+	  po[i0 * so0 + i1 * so1 + i2 * so2 + i3]
+	    = pi[i0 * si0 + i1 + i2 * si1 + i3 * si2];
+	}
+      }
+    }
+  }
+
+  return 0;
+}
+
+#ifdef LIBVETF_INTRINSIC
+template<>
+inline  int transpose4_0312<float>(uint64_t out, uint64_t in, const int32_t* dim_size) {
+  return transpose4_0312_f32(out, in, dim_size) ;
+}
+#endif
+}
 
 int op_Transpose(const void* args, size_t len)
 {
@@ -934,38 +946,58 @@ int op_Transpose(const void* args, size_t len)
     << ")";
 
   int ret = 1;
-#ifdef SET_TIMER
-  unsigned long long start = __veperf_get_stm();
-#endif
 
   if (p->dtype == DT_FLOAT) {
     if (p->size == 4) {
       if (p->perm[0] == 0 && p->perm[1] == 2 
           && p->perm[2] == 3 && p->perm[3] == 1) {
-#ifndef LIBVETF_INTRINSIC
-        ret = transpose4_0231<float>(p->out, p->in, p->dim_size);
-#else
-        ret = transpose4_0231(p->out, p->in, p->dim_size);
-#endif
+	ret = 0 ;
+#pragma omp parallel reduction(|:ret)
+	{
+	  int64_t nthreads = omp_get_num_threads() ;
+	  int64_t threadid = omp_get_thread_num() ;
 
-#ifdef SET_TIMER
-  unsigned long long end = __veperf_get_stm();
-  printf("transpose231, len %d %d %d %d:%lfms\n",p->dim_size[0],p->dim_size[1],p->dim_size[2],p->dim_size[3],(end-start)/(800e3));
-#endif
+	  int64_t chunkSize = p->dim_size[0] / nthreads ;
+	  int64_t remain    = p->dim_size[0] % nthreads ;
+
+	  int64_t chunkBegin = chunkSize * threadid + ( threadid < remain ? threadid : remain ) ;
+	  int64_t myChunk    = chunkSize + ( threadid < remain ? 1 : 0 ) ;
+
+	  int64_t offset    = chunkBegin * sizeof(float) *  p->dim_size[1] * p->dim_size[2] * p->dim_size[3] ;
+
+	  if( myChunk > 0 ) {
+	    int32_t dim_size[4] = { (int32_t)myChunk, p->dim_size[1], p->dim_size[2], p->dim_size[3] } ;
+	    ret = transpose4_0231<float>(p->out+offset, p->in+offset, dim_size) ;
+	  }
+	  else {
+	    ret |= 0 ;
+	  }
+	}
 
       } else if (p->perm[0] == 0 && p->perm[1] == 3 
                  && p->perm[2] == 1 && p->perm[3] == 2) {
-#ifndef LIBVETF_INTRINSIC
-        ret = transpose4_0312<float>(p->out, p->in, p->dim_size);
-#else
-        ret = transpose4_0312(p->out, p->in, p->dim_size);
-#endif
+	ret = 0 ;
+#pragma omp parallel reduction(|:ret)
+	{
+	  int64_t nthreads = omp_get_num_threads() ;
+	  int64_t threadid = omp_get_thread_num() ;
 
-#ifdef SET_TIMER
-  unsigned long long end = __veperf_get_stm();
-  printf("transpose312, len %d %d %d %d:%lfms\n",p->dim_size[0],p->dim_size[1],p->dim_size[2],p->dim_size[3],(end-start)/(800e3));
-#endif
+	  int64_t chunkSize = p->dim_size[0] / nthreads ;
+	  int64_t remain    = p->dim_size[0] % nthreads ;
 
+	  int64_t chunkBegin = chunkSize * threadid + ( threadid < remain ? threadid : remain ) ;
+	  int64_t myChunk    = chunkSize + ( threadid < remain ? 1 : 0 ) ;
+
+	  int64_t offset    = chunkBegin * sizeof(float) *  p->dim_size[1] * p->dim_size[2] * p->dim_size[3] ;
+
+	  if( myChunk > 0 ) {
+	    int32_t dim_size[4] = { (int32_t)myChunk, p->dim_size[1], p->dim_size[2], p->dim_size[3] } ;
+	    ret = transpose4_0312<float>(p->out+offset, p->in+offset, dim_size) ;
+	  }
+	  else {
+	    ret |= 0 ;
+	  }
+	}
       }
     }
   }
