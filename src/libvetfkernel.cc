@@ -33,13 +33,21 @@ public :
   }
 
 private :
+  const int num_cores = 8 ;
+
   void setaffinity() {
+    int core_offset = 0 ;
+    if (const char* tmp = getenv("TF_VE_CORE_OFFSET")) {
+      core_offset = atoi(tmp);
+    }
+
 #pragma omp parallel
     {
       int threadid = omp_get_thread_num() ;
+      int coreid   = (core_offset + threadid) % num_cores ;
       cpu_set_t mask ;
       CPU_ZERO(&mask) ;
-      CPU_SET(threadid, &mask) ;
+      CPU_SET(coreid, &mask) ;
       sched_setaffinity(0, sizeof(mask), &mask ) ;
     }
   }
