@@ -29,7 +29,23 @@ add_library(vetfkernel STATIC
   sparse_xent_ops.cc
   $<TARGET_OBJECTS:vetfkernel_intrinsic>)
 
+execute_process(
+        COMMAND git log -1 --format=%h
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE VETFKERNEL_REVISION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+
+execute_process(
+        COMMAND git log -1 --format=%h
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/libs/vednn
+        OUTPUT_VARIABLE VEDNN_REVISION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+
 target_compile_options(vetfkernel PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
+target_compile_definitions(vetfkernel PRIVATE VETFKERNEL_REVISION=${VETFKERNEL_REVISION})
+target_compile_definitions(vetfkernel PRIVATE VEDNN_REVISION=${VEDNN_REVISION})
 
 target_include_directories(vetfkernel PRIVATE ${VEDNN_PATH}/src)
 target_include_directories(vetfkernel PRIVATE /opt/nec/ve/nlc/1.0.0/include ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/intrinsic)

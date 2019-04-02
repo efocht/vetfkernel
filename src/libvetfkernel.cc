@@ -20,10 +20,15 @@ extern "C" {
 }
 #endif
 
+#define _STR(v) __STR(v)
+#define __STR(v) #v
+
 class InitVETFKernel
 {
 public :
   InitVETFKernel() {
+    LOG(1) << "vetfkernel revision: " << _STR(VETFKERNEL_REVISION);
+    LOG(1) << "vednn revision: " << _STR(VEDNN_REVISION);
     setaffinity() ;
     ASL::initialize() ;
   }
