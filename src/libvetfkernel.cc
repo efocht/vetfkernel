@@ -9,6 +9,7 @@
 #include "asl.h"
 #include "kernel.h"
 #include "log.h"
+#include "revision.h"
 
 #define MAX_KERNEL 1024
 
@@ -27,8 +28,8 @@ class InitVETFKernel
 {
 public :
   InitVETFKernel() {
-    LOG(1) << "vetfkernel revision: " << _STR(VETFKERNEL_REVISION);
-    LOG(1) << "vednn revision: " << _STR(VEDNN_REVISION);
+    LOG(1) << "vetfkernel revision: " << VETFKERNEL_REVISION;
+    LOG(1) << "vednn revision: " << VEDNN_REVISION;
     setaffinity() ;
     ASL::initialize() ;
   }

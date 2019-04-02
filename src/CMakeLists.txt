@@ -27,26 +27,19 @@ add_library(vetfkernel STATIC
   gather_functor.cc
   segment_reduction_ops.cc
   sparse_xent_ops.cc
+  revision.h
   $<TARGET_OBJECTS:vetfkernel_intrinsic>)
 
-execute_process(
-        COMMAND git log -1 --format=%h
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE VETFKERNEL_REVISION
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-
-execute_process(
-        COMMAND git log -1 --format=%h
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/libs/vednn
-        OUTPUT_VARIABLE VEDNN_REVISION
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-
 target_compile_options(vetfkernel PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>)
-target_compile_definitions(vetfkernel PRIVATE VETFKERNEL_REVISION=${VETFKERNEL_REVISION})
-target_compile_definitions(vetfkernel PRIVATE VEDNN_REVISION=${VEDNN_REVISION})
 
 target_include_directories(vetfkernel PRIVATE ${VEDNN_PATH}/src)
 target_include_directories(vetfkernel PRIVATE /opt/nec/ve/nlc/1.0.0/include ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/intrinsic)
+target_include_directories(vetfkernel PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
+add_custom_target(check_revision
+        ALL
+        DEPENDS revision.h.in
+        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/revision.h
+        COMMAND ${CMAKE_COMMAND} -DTOPDIR=${CMAKE_SOURCE_DIR} -P ${CMAKE_SOURCE_DIR}/cmake/revision.cmake)
+
+add_dependencies(vetfkernel check_revision)
