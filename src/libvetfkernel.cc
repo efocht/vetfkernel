@@ -24,6 +24,8 @@ extern "C" {
 #define _STR(v) __STR(v)
 #define __STR(v) #v
 
+
+
 class InitVETFKernel
 {
 public :
@@ -47,17 +49,40 @@ private :
       core_offset = atoi(tmp);
     }
 
+    int num_threads ;
+#pragma omp parallel
+    {
+#pragma omp_master
+      {
+	num_threads = omp_get_num_threads() ;
+      }
+    }
+
+    cpu_set_t mask[num_threads] ;
+    // ncc does not create parallel routine in the function using CPU_SET...
+    set_mask(num_threads, core_offset, mask) ;
+
+
 #pragma omp parallel
     {
       int threadid = omp_get_thread_num() ;
-      int coreid   = (core_offset + threadid) % num_cores ;
-      cpu_set_t mask ;
-      CPU_ZERO(&mask) ;
-      CPU_SET(coreid, &mask) ;
-      sched_setaffinity(0, sizeof(mask), &mask ) ;
+      sched_setaffinity(0, sizeof(cpu_set_t), &mask[threadid] ) ;
     }
   }
-} _InitVETFKernel ; 
+
+  void set_mask(int num_threads, int core_offset, cpu_set_t* mask)
+  {
+    for(int i=0; i<num_threads ; i++) {
+      int coreid   = (core_offset + i) % num_cores ;
+
+      CPU_ZERO(&mask[i]) ;
+      CPU_SET(coreid, &mask[i]) ;
+    }
+  }
+
+
+} _InitVETFKernel ;
+
 
 extern "C" {
     int get_num_kernels();
@@ -73,6 +98,7 @@ extern "C" {
 #endif
 
     int op_Assign(const void* arg, size_t len);
+
 }
 
 struct Kernel
