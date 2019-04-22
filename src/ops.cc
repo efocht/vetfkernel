@@ -147,7 +147,14 @@ int op_fill(const void* args, size_t len)
 
   if (dtype == DT_FLOAT) {
     return fill<float>(args, len);
-  } else {
+  }
+  else if (dtype == DT_DOUBLE) {
+    return fill<double>(args, len);
+  }
+  else if (dtype == DT_INT64) {
+    return fill<int64_t>(args, len);
+  }
+  else {
     return 1;
   }
 }
