@@ -52,7 +52,6 @@ REGISTER_KERNEL("Transpose", "op_Transpose");
 REGISTER_KERNEL("MatMul", "op_MatMul");
 REGISTER_KERNEL("Softmax", "op_Softmax");
 REGISTER_KERNEL("Pack", "op_Pack");
-REGISTER_KERNEL("Concat", "op_Concat");
 REGISTER_KERNEL("Slice", "op_Slice");
 
 // Unary
@@ -92,7 +91,6 @@ extern "C" {
   int op_Reciprocal(const void* arg, size_t len);
   int op_Log(const void* arg, size_t len);
   int op_Exp(const void* arg, size_t len);
-  int op_Concat(const void* arg, size_t len);
   int op_Slice(const void* arg, size_t len);
 }
 
@@ -1287,67 +1285,6 @@ int op_Pack(const void* args, size_t len)
   return ret;
 }
 
-//
-// Concat
-//
-template<typename T>
-  int concat(uint64_t n, uint64_t dim0, uint64_t dim1, uint64_t out,
-             uint64_t *ins, uint64_t *dim1s )
-  {
-    const T** pi = reinterpret_cast<const T**>(ins);
-    const uint64_t* in_dim1s = reinterpret_cast<const uint64_t*>(dim1s);
-    T* po = reinterpret_cast<T*>(out);
-
-    for(int64_t i=0; i<dim0; i++) {
-      for(int64_t j=0; j<n; j++) {
-        int64_t idim1 = idim1 = in_dim1s[j] ;
-        for(int64_t k=0; k<idim1; k++) {
-          po[k] = pi[j][i*idim1+k] ;
-        }
-        po+=idim1 ;
-      }
-    }
-    return 0 ;
-  }
-
-int op_Concat(const void* args, size_t len)
-{
-  LOG(2) << __FUNCTION__ << " begin";
-
-  int ret=1;
-
-  struct Args {
-    int dtype;
-    uint64_t n_input;
-    uint64_t outputs_flat_dim0;
-    uint64_t outputs_flat_dim1;
-    uint64_t output_ptr ;
-    uint64_t array[1] ;
-  } const* p;
-
-  p = reinterpret_cast<const Args*>(args);
-  uint64_t *array = (uint64_t*)(p->array) ; 
-
-  if (p->dtype == DT_FLOAT) {
-    ret = concat<float>(p->n_input, 
-                        p->outputs_flat_dim0, p->outputs_flat_dim1, p->output_ptr,
-                        array, array+p->n_input) ;
-  }
-  else if (p->dtype == DT_INT32) {
-    ret = concat<int32_t>(p->n_input, 
-                          p->outputs_flat_dim0, p->outputs_flat_dim1, p->output_ptr,
-                          array, array+p->n_input) ;
-  }
-  else if (p->dtype == DT_DOUBLE) {
-    ret = concat<double>(p->n_input, 
-                         p->outputs_flat_dim0, p->outputs_flat_dim1, p->output_ptr,
-                         array, array+p->n_input) ;
-  }
-
-  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
-
-  return ret;
-}
 
 //
 // Slice

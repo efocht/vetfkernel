@@ -377,3 +377,67 @@ int op_softmax_xent_with_logits(const VEOpArgs& args)
 } // namespace
 
 DEFINE_KERNEL(SoftmaxXentWithLogits, op_softmax_xent_with_logits);
+
+
+//
+// Concat
+//
+template<typename T>
+  int concat(uint64_t n, uint64_t dim0, uint64_t dim1, uint64_t out,
+             uint64_t *ins, uint64_t *dim1s )
+  {
+    const T** pi = reinterpret_cast<const T**>(ins);
+    const uint64_t* in_dim1s = reinterpret_cast<const uint64_t*>(dim1s);
+    T* po = reinterpret_cast<T*>(out);
+
+    for(int64_t i=0; i<dim0; i++) {
+      for(int64_t j=0; j<n; j++) {
+        int64_t idim1 = idim1 = in_dim1s[j] ;
+        for(int64_t k=0; k<idim1; k++) {
+          po[k] = pi[j][i*idim1+k] ;
+        }
+        po+=idim1 ;
+      }
+    }
+    return 0 ;
+  }
+
+namespace {
+int op_Concat(const VEOpArgs& args)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  int ret=1;
+
+  int narg = 0 ;
+  const int64_t dtype              = *args.arg<int64_t>(narg++) ;
+  const uint64_t n_input           = *args.arg<uint64_t>(narg++) ;
+  const uint64_t outputs_flat_dim0 = *args.arg<uint64_t>(narg++) ;
+  const uint64_t outputs_flat_dim1 = *args.arg<uint64_t>(narg++) ;
+  const uint64_t output_ptr        = *args.arg<uint64_t>(narg++) ;
+
+
+  uint64_t ins[n_input] ;
+  uint64_t dim1s[n_input] ;
+  for(int64_t i=0; i<n_input; i++) {
+    ins[i]   = *args.arg<uint64_t>(narg++) ;
+    dim1s[i] = *args.arg<uint64_t>(narg++) ;
+  }
+
+  if (dtype == DT_FLOAT) {
+    ret = concat<float>(n_input, outputs_flat_dim0, outputs_flat_dim1, output_ptr, ins, dim1s ) ;
+  }
+  else if (dtype == DT_INT32) {
+    ret = concat<int32_t>(n_input, outputs_flat_dim0, outputs_flat_dim1, output_ptr, ins, dim1s ) ;
+  }
+  else if (dtype == DT_DOUBLE) {
+    ret = concat<double>(n_input, outputs_flat_dim0, outputs_flat_dim1, output_ptr, ins, dim1s ) ;
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+
+  return ret;
+}
+}
+
+DEFINE_KERNEL(Concat, op_Concat);

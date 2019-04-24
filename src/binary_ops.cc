@@ -758,6 +758,20 @@ int divnonan_n1(uint64_t out, uint64_t in0, uint64_t in1, size_t nelems)
 }
 
 template <typename T>
+int divnonan_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi0 = reinterpret_cast<const T*>(in0);
+  const T* pi1 = reinterpret_cast<const T*>(in1);
+
+  for (size_t i = 0; i < n; ++i) {
+    po[i] = pi1[i] == T(0.) ? T(0.) : pi0[i]/pi1[i] ;
+  }
+
+  return 0;
+}
+
+template <typename T>
 int divnonan2_nn_n1(uint64_t out, 
                     uint64_t in0,
                     uint64_t in1, 
@@ -784,11 +798,20 @@ int divnonan2_nn_n1(uint64_t out,
 }
 
 int op_divnonan(const BinaryOpArgs& args) {
+
+//  printf("args.in0.dims = %ld\n", args.in0.dims) ;
+//  for(int i=0; i<args.in0.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in0.dim_size[i]) ;
+//  printf("args.in1.dims = %ld\n", args.in1.dims) ;
+//  for(int i=0; i<args.in1.dims ; i++ ) printf(" [%d] = %ld\n", i, args.in1.dim_size[i]) ;
+
   if (CheckTypesAll(args, DT_FLOAT)) {
 
     int r=1;
 
-    if (args.in0.nelems == 1) {
+    if (args.in0.nelems == args.in1.nelems) {
+     r = divnonan_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
+                            args.in0.nelems);
+    } else if (args.in0.nelems == 1) {
       r = divnonan_1n<float>(args.out.addr, args.in0.addr, args.in1.addr,
                             args.out.nelems);
     } else if (args.in1.nelems == 1) {
@@ -819,7 +842,6 @@ int pow_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
   const T* pi1 = reinterpret_cast<const T*>(in1);
 
   for (size_t i = 0; i < n; ++i) {
-    T diff = pi0[i] - pi1[i];
     po[i] = std::pow(pi0[i],pi1[i]) ;
   }
 
