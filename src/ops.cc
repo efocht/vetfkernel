@@ -63,6 +63,8 @@ REGISTER_KERNEL("Floor", "op_Floor");
 REGISTER_KERNEL("Reciprocal", "op_Reciprocal");
 REGISTER_KERNEL("Log", "op_Log");
 REGISTER_KERNEL("Exp", "op_Exp");
+REGISTER_KERNEL("Sigmoid", "op_Sigmoid");
+REGISTER_KERNEL("Tanh", "op_Tanh");
 
 #define CHECK_ARG_LEN(l0, l1) \
   if ((l0) != (l1)) { \
@@ -91,6 +93,8 @@ extern "C" {
   int op_Reciprocal(const void* arg, size_t len);
   int op_Log(const void* arg, size_t len);
   int op_Exp(const void* arg, size_t len);
+  int op_Sigmoid(const void* arg, size_t len);
+  int op_Tanh(const void* arg, size_t len);
   int op_Slice(const void* arg, size_t len);
 }
 
@@ -851,6 +855,104 @@ int op_Exp(const void* args, size_t len)
   return 0;
 }
 
+
+//
+// Sigmoid
+//
+namespace {
+  template<typename Tin, typename Tout>
+  int op_sigmoid(uint64_t out, uint64_t in, size_t nelems)
+  {
+    Tout* po = reinterpret_cast<Tout*>(out);
+    const Tin* pi = reinterpret_cast<Tin*>(in);
+
+    for (int64_t i = 0; i < nelems; ++i) {
+      const Tout One = Tout(1.) ;
+      po[i] = One / (One + std::exp(-pi[i])) ;
+    }
+    return 0;
+  }
+}
+
+int op_Sigmoid(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct _Tensor {
+    int dtype;
+    int data_format;
+    uint64_t addr;
+    int32_t dims;
+    int64_t nelems;
+    int64_t dim_size[8];
+  };
+
+  struct Args {
+    _Tensor in;
+    _Tensor out;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
+    op_sigmoid<float, float>(p->out.addr, p->in.addr, p->in.nelems);
+  } else {
+    return 1;
+  }
+
+  LOG(2) << __FUNCTION__ << " end";
+  return 0;
+}
+
+//
+// Tanh
+//
+namespace {
+  template<typename Tin, typename Tout>
+  int op_tanh(uint64_t out, uint64_t in, size_t nelems)
+  {
+    Tout* po = reinterpret_cast<Tout*>(out);
+    const Tin* pi = reinterpret_cast<Tin*>(in);
+
+    for (int64_t i = 0; i < nelems; ++i) {
+      po[i] = std::tanh(pi[i]) ;
+    }
+    return 0;
+  }
+}
+
+int op_Tanh(const void* args, size_t len)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  struct _Tensor {
+    int dtype;
+    int data_format;
+    uint64_t addr;
+    int32_t dims;
+    int64_t nelems;
+    int64_t dim_size[8];
+  };
+
+  struct Args {
+    _Tensor in;
+    _Tensor out;
+  } const* p;
+
+  CHECK_ARG_LEN(len, sizeof(Args));
+  p = reinterpret_cast<const Args*>(args);
+
+  if (p->in.dtype == DT_FLOAT || p->out.dtype == DT_FLOAT) {
+    op_tanh<float, float>(p->out.addr, p->in.addr, p->in.nelems);
+  } else {
+    return 1;
+  }
+
+  LOG(2) << __FUNCTION__ << " end";
+  return 0;
+}
+
 //
 // Transpose
 //
@@ -1530,3 +1632,4 @@ int op_Square(const void* args, size_t len)
 #endif
   return r;
 }
+

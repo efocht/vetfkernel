@@ -27,6 +27,7 @@ add_library(vetfkernel STATIC
   gather_functor.cc
   segment_reduction_ops.cc
   sparse_xent_ops.cc
+  cwise_ops_gradients.cc
   revision.h
   $<TARGET_OBJECTS:vetfkernel_intrinsic>)
 
