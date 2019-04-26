@@ -246,7 +246,7 @@ void AddNOp(T* out, T** in, size_t num_elems, size_t num_inputs)
 int op_AddN(const void* args, size_t len)
 {
   LOG(1) << __FUNCTION__;
-#define MAX_INPUTS 16
+#define MAX_INPUTS 32
   struct Args {
     int output_type;
     uint64_t out;
