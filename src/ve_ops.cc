@@ -510,3 +510,151 @@ int op_Split(const VEOpArgs& args)
 }
 
 DEFINE_KERNEL(Split, op_Split);
+
+
+//
+// StridedSliceGrad
+//
+#define STRIDED_SLICE_GRAD_MAX_HANDLE_DIM 3
+
+template<typename T>
+int strided_slice1(const int64_t* begin_di,
+                   const int64_t* end_di,
+		   const int64_t* stride_di,
+		   const Tensor*  dy_tensor,
+                   Tensor* result_tensor)
+{
+  const T* pi = reinterpret_cast<const T*>(dy_tensor->addr);
+  T* po = reinterpret_cast<T*>(result_tensor->addr);
+
+  const int64_t d0 = result_tensor->dim_size[0] ;
+
+  for(int64_t i=0; i<d0; i++) po[i] = T(0.) ;
+
+  for(int64_t i0=begin_di[0]; i0<end_di[0] ; i0+=stride_di[0] ) {
+    po[i0] = *pi ; pi++ ;
+  }
+
+  return 0 ;
+}
+
+
+template<typename T>
+int strided_slice2(const int64_t* begin_di,
+                   const int64_t* end_di,
+		   const int64_t* stride_di,
+		   const Tensor*  dy_tensor,
+                   Tensor* result_tensor)
+{
+  const T* pi = reinterpret_cast<const T*>(dy_tensor->addr);
+  T* po = reinterpret_cast<T*>(result_tensor->addr);
+
+  const int64_t d0 = result_tensor->dim_size[0] ;
+  const int64_t d1 = result_tensor->dim_size[1] ;
+
+  for(int64_t i=0; i<d0*d1; i++) po[i] = T(0.) ;
+
+  for(int64_t i0=begin_di[0]; i0<end_di[0] ; i0+=stride_di[0] ) {
+    for(int64_t i1=begin_di[1]; i1<end_di[1] ; i1+=stride_di[1] ) {
+      po[i0*d1+i1] = *pi ; pi++ ;
+    }
+  }
+
+  return 0 ;
+}
+
+template<typename T>
+int strided_slice3(const int64_t* begin_di,
+                   const int64_t* end_di,
+		   const int64_t* stride_di,
+		   const Tensor*  dy_tensor,
+                   Tensor* result_tensor)
+{
+  const T* pi = reinterpret_cast<const T*>(dy_tensor->addr);
+  T* po = reinterpret_cast<T*>(result_tensor->addr);
+
+  const int64_t d0 = result_tensor->dim_size[0] ;
+  const int64_t d1 = result_tensor->dim_size[1] ;
+  const int64_t d2 = result_tensor->dim_size[2] ;
+
+  for(int64_t i=0; i<d0*d1*d2; i++) po[i] = T(0.) ;
+
+  for(int64_t i0=begin_di[0]; i0<end_di[0] ; i0+=stride_di[0] ) {
+    for(int64_t i1=begin_di[1]; i1<end_di[1] ; i1+=stride_di[1] ) {
+      for(int64_t i2=begin_di[2]; i2<end_di[2] ; i2+=stride_di[2] ) {
+	po[(i0*d1+i1)*d2+i2] = *pi ; pi++ ;
+      }
+    }
+  }
+
+  return 0 ;
+}
+
+namespace {
+int op_StridedSliceGrad(const VEOpArgs& args)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  int ret=1;
+
+  int narg = 0 ;
+  const int64_t processing_dims = *args.arg<int64_t>(narg++) ;
+
+  const Tensor *dy_tensor     = args.arg<Tensor>(narg++) ;
+  const Tensor *result_tensor = args.arg<Tensor>(narg++) ;
+
+  int64_t begin_di[STRIDED_SLICE_GRAD_MAX_HANDLE_DIM] ;
+  int64_t end_di[STRIDED_SLICE_GRAD_MAX_HANDLE_DIM] ;
+  int64_t stride_di[STRIDED_SLICE_GRAD_MAX_HANDLE_DIM] ;
+
+  for(int64_t i=0; i<processing_dims; i++) {
+    begin_di[i] = *args.arg<int64_t>(narg++) ;
+  }
+  for(int64_t i=0; i<processing_dims; i++) {
+    end_di[i] = *args.arg<int64_t>(narg++) ;
+  }
+  for(int64_t i=0; i<processing_dims; i++) {
+    stride_di[i] = *args.arg<int64_t>(narg++) ;
+  }
+
+  const int dtype = dy_tensor->dtype ;
+
+  if (dtype == DT_FLOAT) {
+    switch(processing_dims) {
+    case 1:
+      ret = strided_slice1<float>(begin_di, end_di, stride_di, dy_tensor, (Tensor*)result_tensor) ;
+      break ;
+    case 2:
+      ret = strided_slice2<float>(begin_di, end_di, stride_di, dy_tensor, (Tensor*)result_tensor) ;
+      break ;
+    case 3 :
+      ret = strided_slice3<float>(begin_di, end_di, stride_di, dy_tensor, (Tensor*)result_tensor) ;
+      break ;
+    default :
+      break ;
+    }
+  }
+  else if (dtype == DT_DOUBLE) {
+    switch(processing_dims) {
+    case 1:
+      ret = strided_slice1<double>(begin_di, end_di, stride_di, dy_tensor, (Tensor*)result_tensor) ;
+      break ;
+    case 2:
+      ret = strided_slice2<double>(begin_di, end_di, stride_di, dy_tensor, (Tensor*)result_tensor) ;
+      break ;
+    case 3 :
+      ret = strided_slice3<double>(begin_di, end_di, stride_di, dy_tensor, (Tensor*)result_tensor) ;
+      break ;
+    default :
+      break ;
+    }
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+
+  return ret;
+}
+}
+#undef STRIDED_SLICE_GRAD_MAX_HANDLE_DIM
+
+DEFINE_KERNEL(StridedSliceGrad, op_StridedSliceGrad);
