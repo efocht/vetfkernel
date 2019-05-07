@@ -733,3 +733,60 @@ int op_StridedSliceGrad(const VEOpArgs& args)
 #undef STRIDED_SLICE_GRAD_MAX_HANDLE_DIM
 
 DEFINE_KERNEL(StridedSliceGrad, op_StridedSliceGrad);
+
+
+//
+// L2Loss
+//
+template<typename T>
+  int l2loss(const int64_t  input_length,
+	     const uint64_t input_addr,
+	     const uint64_t output_addr)
+  {
+    const T* pi = reinterpret_cast<const T*>(input_addr);
+    T* po = reinterpret_cast<T*>(output_addr);
+
+    T sum = T(0.) ;
+    for(int64_t i=0; i<input_length; i++) {
+      const T v = pi[i] ;
+      sum += v*v ;
+    }
+    po[0] = sum * T(0.5) ;
+
+    return 0 ;
+  }
+
+namespace {
+int op_L2Loss(const VEOpArgs& args)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  if (args.nVariables() != 2)
+    return 1 ;
+
+  int ret=1;
+
+  const Tensor *input_tensor  = args.arg<Tensor>(0) ;
+  const Tensor *output_tensor = args.arg<Tensor>(1) ;
+
+  const int dtype = input_tensor->dtype ;
+
+  const int64_t input_length = input_tensor->nelems ;
+
+  const int64_t input_addr  = input_tensor->addr  ;
+  const int64_t output_addr = output_tensor->addr ;
+
+  if (dtype == DT_FLOAT) {
+    ret = l2loss<float>(input_length, input_addr, output_addr) ;
+  }
+  else if (dtype == DT_DOUBLE) {
+    ret = l2loss<double>(input_length, input_addr, output_addr) ;
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+
+  return ret;
+}
+}
+
+DEFINE_KERNEL(L2Loss, op_L2Loss);
