@@ -451,10 +451,10 @@ template<typename T>
             const int64_t  prefix_dim_size,
 	    const int64_t  split_dim_size,
 	    const int64_t  suffix_dim_size,
-	    const uint64_t input_addrs,
+	    const uint64_t input_addr,
 	    uint64_t       *output_addrs)
   {
-    const T* pi = reinterpret_cast<const T*>(input_addrs);
+    const T* pi = reinterpret_cast<const T*>(input_addr);
     T** po = reinterpret_cast<T**>(output_addrs);
 
     const int64_t split_dim_output_size = split_dim_size / num_split ;
@@ -510,6 +510,81 @@ int op_Split(const VEOpArgs& args)
 }
 
 DEFINE_KERNEL(Split, op_Split);
+
+
+//
+// SplitV
+//
+template<typename T>
+  int split_v(const int64_t  num_split,
+              const int64_t  prefix_dim_size,
+	      const int64_t  split_dim_size,
+	      const int64_t  suffix_dim_size,
+	      const int64_t  *split_sizes,
+	      const uint64_t input_addr,
+	      uint64_t       *output_addrs)
+  {
+    const T* pi = reinterpret_cast<const T*>(input_addr);
+    T** po = reinterpret_cast<T**>(output_addrs);
+
+
+    for(int64_t i=0; i<prefix_dim_size; i++) {
+      int64_t offset = 0 ;
+      for(int64_t n=0; n<num_split; n++) {
+	const int64_t split_size = split_sizes[n] ;
+ 	for(int64_t j=0; j<split_size*suffix_dim_size; j++) {
+	  po[n][i*split_size*suffix_dim_size+j]
+		= pi[(i*split_dim_size+offset)*suffix_dim_size+j] ;
+	}
+ 	offset += split_size ;
+      }
+    }
+    return 0 ;
+  }
+
+namespace {
+int op_SplitV(const VEOpArgs& args)
+{
+  LOG(2) << __FUNCTION__ << " begin";
+
+  int ret=1;
+
+  int narg = 0 ;
+  const int64_t num_split       = *args.arg<int64_t>(narg++) ;
+  const int64_t prefix_dim_size = *args.arg<int64_t>(narg++) ;
+  const int64_t split_dim_size  = *args.arg<int64_t>(narg++) ;
+  const int64_t suffix_dim_size = *args.arg<int64_t>(narg++) ;
+
+  const Tensor *input_tensor = args.arg<Tensor>(narg++) ;
+  const uint64_t input_addr  = input_tensor->addr ;
+
+  uint64_t output_addrs[num_split] ;
+  int64_t  split_sizes[num_split] ;
+  for(int64_t i=0; i<num_split; i++) {
+    const Tensor *result = args.arg<Tensor>(narg++) ;
+    output_addrs[i] = result->addr ;
+    split_sizes[i] = *args.arg<int64_t>(narg++) ;
+  }
+
+  const int dtype = input_tensor->dtype ;
+
+  if (dtype == DT_FLOAT) {
+    ret = split_v<float>(num_split, prefix_dim_size, split_dim_size, suffix_dim_size,
+	                 split_sizes, input_addr, output_addrs) ;
+  }
+  else if (dtype == DT_DOUBLE) {
+    ret = split_v<double>(num_split, prefix_dim_size, split_dim_size, suffix_dim_size,
+                          split_sizes, input_addr, output_addrs) ;
+  }
+
+  LOG(2) << __FUNCTION__ << " end. ret=" << ret;
+
+  return ret;
+}
+}
+
+DEFINE_KERNEL(SplitV, op_SplitV);
+
 
 
 //
