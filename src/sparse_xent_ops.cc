@@ -41,6 +41,7 @@ int SparseSoftmaxXentWithLogits(int64_t batch_size, int64_t num_classes,
 
 #if 1
   if( num_classes == 2 ) {
+    // vectorize  batch_loop
     for(int64_t i=0; i<batch_size; i++) {
       const T logits0 = logits[2*i+0] ; 
       const T logits1 = logits[2*i+1] ; 
@@ -67,6 +68,8 @@ int SparseSoftmaxXentWithLogits(int64_t batch_size, int64_t num_classes,
     }
   }
   else {
+    // omp-parallelize batch loop
+#pragma omp parallel for
     for(int64_t i=0; i<batch_size; i++) {
       T max_logits = T(0.) ;
       for(int64_t j=0; j<num_classes; j++) {
