@@ -37,6 +37,7 @@ public :
   }
 
   ~InitVETFKernel() {
+    LOG(1) << "~InitVETFKernel";
     ASL::finalize() ;
   }
 
