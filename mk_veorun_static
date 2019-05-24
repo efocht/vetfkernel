@@ -31,7 +31,6 @@ fi
 NM=${NM:-nm}
 CC=${CC:-/opt/nec/ve/bin/ncc}
 CXX=${CXX:-/opt/nec/ve/bin/nc++}
-LD=${LD:-/opt/nec/ve/bin/nld}
 CFLAGS=${CFLAGS:-}
 
 EXT_FILE=`mktemp /tmp/veo.extXXXXXXXX`
@@ -92,11 +91,7 @@ tail >> $SRC_FILE
 
 $CC $CFLAGS -c $SRC_FILE -o $OBJ_FILE
 
-#echo $CXX $CFLAGS -o $VEORUN $OBJ_FILE $LIBS /opt/nec/ve/lib/libveorun.a $EXTRA_LIBS
-#$CXX $CFLAGS -v -o $VEORUN $OBJ_FILE $LIBS /opt/nec/ve/lib/libveorun.a $EXTRA_LIBS \
-#    && echo "created specific $VEORUN"
-
-# temprary call nld directory to remove libraries for veperf
-${LD} /opt/nec/ve/lib/crt1.o /opt/nec/ve/lib/crti.o -z max-page-size=0x4000000 -warn-once -L/opt/nec/ve/ncc/2.1.27/lib -L/opt/nec/ve/lib/gcc -L/opt/nec/ve/lib -L/opt/nec/ve/lib/gcc -u __adv_ctrl -u __veproginf_p_ctrl -u __veperfcnt_ctrl -u __nec_start_threads -o veorun_tf ${OBJ_FILE} src/libvetfkernel.a /opt/nec/ve/lib/libveorun.a /opt/nec/ve/nlc/1.0.0/lib/libblas_sequential.a /opt/nec/ve/nlc/1.0.0/lib/libasl_sequential.a /opt/nec/nosupport/llvm-ve-1.0.1/lib/clang/9.0.0/lib/linux/libclang_rt.builtins-ve.a libs/vednn/src/libvednn_openmp.a -lveio --enable-new-dtags -rpath=/opt/nec/ve/ncc/2.1.27/lib -lnc++ -lvastfp -lvastfp -lncc -lsysve -ldl -lpthread -lm -lc -lncc -lgcc /opt/nec/ve/lib/crtn.o
+$CXX $CFLAGS -o $VEORUN $OBJ_FILE $LIBS /opt/nec/ve/lib/libveorun.a $EXTRA_LIBS \
+    && echo "created specific $VEORUN"
 
 rm -f $EXT_FILE $DEF_FILE $SRC_FILE $OBJ_FILE
