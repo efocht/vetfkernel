@@ -56,7 +56,10 @@ struct _Tensor {
 
     s << "[dtype=" << dtype
       << ",dims=" << dims
-      << ",nelems=" << nelems
+      << "[";
+    for (int i = 0; i < dims; ++i)
+        s << " " << dim_size[i];
+    s  << " ],nelems=" << nelems
       << "]";
     return s.str();
   }
@@ -77,6 +80,13 @@ bool CheckTypes(const BinaryOpArgs& args, int dt0, int dt1, int dt2)
 
 bool CheckTypesAll(const BinaryOpArgs& args, int dtype) {
   return CheckTypes(args, dtype, dtype, dtype);
+}
+
+bool CheckDimsAll(const BinaryOpArgs& args, size_t dims)
+{
+    return args.in0.dims == dims
+        && args.in1.dims == dims
+        && args.out.dims == dims;
 }
 
 
@@ -170,6 +180,36 @@ int add2_nn_1n(uint64_t out,
   return 0;
 }
 
+// X = Y op Z
+template<typename T, typename F>
+int op3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
+{
+    T* px = reinterpret_cast<T*>(X.addr);
+    T const* py = reinterpret_cast<T*>(Y.addr);
+    T const* pz = reinterpret_cast<T*>(Z.addr);
+
+    int64_t const* sx = X.dim_size;
+    int64_t const* sy = Y.dim_size;
+    int64_t const* sz = Z.dim_size;
+
+    for (size_t i0 = 0; i0 < sx[0]; ++i0) {
+        for (size_t i1 = 0; i1 < sx[1]; ++i1) {
+            for (size_t i2 = 0; i2 < sx[2]; ++i2) {
+                px[i0 * sx[1] * sx[2] + i1 * sx[2] + i2]
+                    = op(py[(i0 % sy[0]) * sy[1] * sy[2] + (i1 % sy[1]) * sy[2] + (i2 % sy[2])],
+                         pz[(i1 % sz[0]) * sz[1] * sz[2] + (i1 % sz[1]) * sz[2] + (i2 % sz[2])]);
+            }
+        }
+    }
+
+    return 0;
+}
+
+template <typename T>
+int add3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+    return op3<T>(X, Y, Z, [](T y, T z) -> float { return y + z; });
+}
 
 int op_add(const BinaryOpArgs& args) {
 
@@ -198,6 +238,8 @@ int op_add(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
+    } else if (CheckDimsAll(args, 3)) {
+      r = add3<float>(args.out, args.in0, args.in1);
     }
   
     return r;
@@ -292,6 +334,11 @@ int sub2_nn_1n(uint64_t out,
   return 0;
 }
 
+template <typename T>
+int sub3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+    return op3<T>(X, Y, Z, [](T y, T z) -> float { return y - z; });
+}
 
 int op_sub(const BinaryOpArgs& args) {
 
@@ -331,6 +378,8 @@ int op_sub(const BinaryOpArgs& args) {
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
+    } else if (CheckDimsAll(args, 3)) {
+      r = sub3<float>(args.out, args.in0, args.in1);
     }
     return r;
   }
@@ -683,6 +732,13 @@ inline int div2_nn_n1<float>(uint64_t out,
 }
 #endif
 
+template <typename T>
+int div3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+    return op3<T>(X, Y, Z, [](T y, T z) -> float { return y / z; });
+}
+
+
 int op_div(const BinaryOpArgs& args) {
 
 //  printf("args.in0.dims = %ld\n", args.in0.dims) ;
@@ -715,6 +771,8 @@ int op_div(const BinaryOpArgs& args) {
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
+    } else if (CheckDimsAll(args, 3)) {
+      r = div3<float>(args.out, args.in0, args.in1);
     }
     return r;
   }
