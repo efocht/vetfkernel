@@ -6,6 +6,7 @@
 
 // instance of the static member
 asl_random_t* ASL::rnd ;
+int64_t       ASL::asl_thread_num ;
 
 void ASL::initialize () {
   if (asl_library_initialize() != ASL_ERROR_OK) {
@@ -15,14 +16,15 @@ void ASL::initialize () {
 
 #pragma omp parallel
   {
-    int nthreads = omp_get_num_threads() ;
-    int threadid = omp_get_thread_num() ;
-
 #pragma omp single
     {
-       rnd = new asl_random_t[nthreads] ;
+      asl_thread_num = omp_get_num_threads() ;
     }
+  }
 
+  rnd = new asl_random_t[asl_thread_num] ;
+
+  for( int threadid = 0 ; threadid < asl_thread_num; threadid++) {
     if (asl_random_create(&rnd[threadid], ASL_RANDOMMETHOD_AUTO) != ASL_ERROR_OK) {
       fprintf(stderr, "asl_random_create failed\n");
       exit(-1);
@@ -37,10 +39,8 @@ void ASL::initialize () {
 }
 
 void ASL::finalize() {
-#pragma omp parallel
-  {
-    int threadid = omp_get_thread_num() ;
 
+  for( int threadid = 0 ; threadid < asl_thread_num; threadid++) {
     if (asl_random_destroy(rnd[threadid]) != ASL_ERROR_OK) {
       fprintf(stderr, "asl_random_destroy failed\n");
       exit(-1);

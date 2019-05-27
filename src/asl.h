@@ -12,6 +12,7 @@ class ASL
     ASL() ;
     ~ASL() ;
     static asl_random_t* rnd ;
+    static int64_t       asl_thread_num ;
 } ; 
 
 
