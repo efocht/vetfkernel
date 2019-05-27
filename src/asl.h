@@ -11,7 +11,7 @@ class ASL
   private:
     ASL() ;
     ~ASL() ;
-    static std::vector<asl_random_t> rnd ;
+    static asl_random_t* rnd ;
 } ; 
 
 

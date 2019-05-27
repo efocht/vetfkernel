@@ -4,7 +4,8 @@
 #include "asl.h"
 #include "log.h"
 
-std::vector<asl_random_t> ASL::rnd ;
+// instance of the static member
+asl_random_t* ASL::rnd ;
 
 void ASL::initialize () {
   if (asl_library_initialize() != ASL_ERROR_OK) {
@@ -19,7 +20,7 @@ void ASL::initialize () {
 
 #pragma omp single
     {
-       rnd.resize(nthreads) ;
+       rnd = new asl_random_t[nthreads] ;
     }
 
     if (asl_random_create(&rnd[threadid], ASL_RANDOMMETHOD_AUTO) != ASL_ERROR_OK) {
@@ -39,6 +40,7 @@ void ASL::finalize() {
 #pragma omp parallel
   {
     int threadid = omp_get_thread_num() ;
+
     if (asl_random_destroy(rnd[threadid]) != ASL_ERROR_OK) {
       fprintf(stderr, "asl_random_destroy failed\n");
       exit(-1);
@@ -49,6 +51,8 @@ void ASL::finalize() {
     fprintf(stderr, "asl_library_finalize failed\n");
     exit(-1);
   }
+
+  delete [] rnd ;
 }
 
 int ASL::getRandom(size_t num, float *val) {
