@@ -1413,16 +1413,68 @@ int slice2(uint64_t input_ptr, uint64_t output_ptr,
   const T* pi = reinterpret_cast<const T*>(input_ptr);
   T* po = reinterpret_cast<T*>(output_ptr);
 
-  for(int i0=0; i0<output_size[0]; i0++) {
-    const T* pi_ = pi + (i0+index[0])*input_size[1] + index[1] ;
-    for(int i1=0; i1<output_size[1]; i1++) {
-      po[i1] = pi_[i1] ;
+  for(size_t i0=0; i0<output_size[0]; i0++) {
+    const size_t ii0 = i0+index[0];
+    const size_t io0 = i0 ;
+    for(size_t i1=0; i1<output_size[1]; i1++) {
+      const size_t ii1 = ii0 * input_size[1] + index[1] + i1 ;
+      const size_t io1 = io0 * output_size[1] + i1 ;
+      po[io1] = pi[ii1] ;
     }
-    po += output_size[1] ;
   }
 
   return 0 ;
+}
+
+template <typename T>
+int slice3(uint64_t input_ptr, uint64_t output_ptr,
+           uint64_t *input_size, uint64_t *output_size, uint64_t *index)
+{
+  const T* pi = reinterpret_cast<const T*>(input_ptr);
+  T* po = reinterpret_cast<T*>(output_ptr);
+
+  for(size_t i0=0; i0<output_size[0]; i0++) {
+    const size_t ii0 = i0+index[0];
+    const size_t io0 = i0 ;
+    for(size_t i1=0; i1<output_size[1]; i1++) {
+      const size_t ii1 = ii0 * input_size[1] + index[1] + i1 ;
+      const size_t io1 = io0 * output_size[1] + i1 ;
+      for(size_t i2=0; i2<output_size[2]; i2++) {
+        const size_t ii2 = ii1 * input_size[2] + index[2] + i2 ;
+        const size_t io2 = io1 * output_size[2] + i2 ;
+        po[io2] = pi[ii2] ;
+      }
+    }
+  }
+  return 0 ;
 } 
+
+template <typename T>
+int slice4(uint64_t input_ptr, uint64_t output_ptr,
+           uint64_t *input_size, uint64_t *output_size, uint64_t *index)
+{
+  const T* pi = reinterpret_cast<const T*>(input_ptr);
+  T* po = reinterpret_cast<T*>(output_ptr);
+
+  for(size_t i0=0; i0<output_size[0]; i0++) {
+    const size_t ii0 = i0+index[0];
+    const size_t io0 = i0 ;
+    for(size_t i1=0; i1<output_size[1]; i1++) {
+      const size_t ii1 = ii0 * input_size[1] + index[1] + i1 ;
+      const size_t io1 = io0 * output_size[1] + i1 ;
+      for(size_t i2=0; i2<output_size[2]; i2++) {
+        const size_t ii2 = ii1 * input_size[2] + index[2] + i2 ;
+        const size_t io2 = io1 * output_size[2] + i2 ;
+        for(size_t i3=0; i3<output_size[3]; i3++) {
+          const size_t ii3 = ii2 * input_size[3] + index[3] + i3 ;
+          const size_t io3 = io2 * output_size[3] + i3 ;
+          po[io3] = pi[ii3] ;
+        }
+      }
+    }
+  }
+  return 0 ;
+}
 
 template <typename T>
 int slice_handle(uint64_t input_dims, uint64_t input_ptr, uint64_t output_ptr, uint64_t *array) 
@@ -1435,11 +1487,13 @@ int slice_handle(uint64_t input_dims, uint64_t input_ptr, uint64_t output_ptr, u
   case 2 :
     ret = slice2<T>(input_ptr, output_ptr, array, array+2, array+4) ;
     break ;
-#if 0 // todo : add larger dim
   case 3 :
+    ret = slice3<T>(input_ptr, output_ptr, array, array+3, array+6) ;
     break ;
   case 4 :
+    ret = slice4<T>(input_ptr, output_ptr, array, array+4, array+8) ;
     break ;
+#if 0 // todo : add larger dim
   case 5 :
     break ;
   case 6 :
