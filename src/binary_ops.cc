@@ -238,6 +238,7 @@ int binop(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
         }
         size_t iy = 0;
         size_t iz = 0;
+#pragma _NEC novector
         for (size_t dim = 0; dim < dims; ++dim) {
             iy = (iy * Y.dim_size[dim]) + ix0[dim] % Y.dim_size[dim];
             iz = (iz * Z.dim_size[dim]) + ix0[dim] % Z.dim_size[dim];
