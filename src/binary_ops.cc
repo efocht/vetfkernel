@@ -1084,6 +1084,9 @@ int op_sqdiff(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
+    } else if (IsSameDims(args)) {
+         r = binop<float>(args.out, args.in0, args.in1,
+                          [](float y, float z) -> float { return (y-z)*(y-z); });
     }
 
     return r;
