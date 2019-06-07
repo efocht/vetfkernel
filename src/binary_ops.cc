@@ -214,7 +214,7 @@ int binop_dim3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
 
 // X = Y op Z
 template<typename T, typename F>
-int binop(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
+int binop_dimN(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
 {
     T* px = reinterpret_cast<T*>(X.addr);
     T const* py = reinterpret_cast<T*>(Y.addr);
@@ -225,7 +225,8 @@ int binop(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
     if (X.dims == 3)
         return binop_dim3<T>(X, Y, Z, op);
 
-    LOG(3) << __FUNCTION__;
+    LOG(3) << __FUNCTION__
+        << " [" << X.nelems << "] = [" << Y.nelems << "] op [" << Z.nelems << "]";
 
     size_t dims = X.dims;
 
@@ -257,6 +258,78 @@ int binop(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
     return 0;
 }
 
+// X = Y op Z
+// X = [d0, d1, d2, d3, d4]
+// Y = [d0, d1, d2, d3, d4]
+// Z = [e0, e1, e2, 1, 1]
+// di >= ei
+
+bool check_binop_dim5_x(const BinaryOpArgs& args)
+{
+  _Tensor const& X = args.out;
+  _Tensor const& Y = args.in0;
+  _Tensor const& Z = args.in1;
+
+  return X.dims == 5 && Y.dims == 5 && Z.dims == 5
+      && X.dim_size[0] == Y.dim_size[0]
+      && X.dim_size[1] == Y.dim_size[1]
+      && X.dim_size[2] == Y.dim_size[2]
+      && X.dim_size[3] == Y.dim_size[3]
+      && X.dim_size[4] == Y.dim_size[4]
+      && X.dim_size[0] >= Z.dim_size[0]
+      && X.dim_size[1] >= Z.dim_size[1]
+      && X.dim_size[2] >= Z.dim_size[2]
+      && Z.dim_size[3] == 1
+      && Z.dim_size[4] == 1;
+}
+
+template<typename T, typename F>
+int binop_dim5_x(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
+{
+  LOG(3) << __FUNCTION__
+      << " [" << X.nelems << "] = [" << Y.nelems << "] op [" << Z.nelems << "]";
+
+  size_t n = X.dim_size[3] * X.dim_size[4];
+  size_t st0[5];
+  size_t st1[5];
+
+  st0[4] = 1;
+  st1[4] = 1;
+  for (int dim = 3; dim >= 0; --dim) {
+    st0[dim] = st0[dim + 1] * X.dim_size[dim + 1];
+    st1[dim] = st1[dim + 1] * Z.dim_size[dim + 1];
+  }
+
+#if 0
+  fprintf(stderr, "st0=[");
+  for (int dim = 0; dim < 5; ++dim) { fprintf(stderr, " %lu", st0[dim]); }
+  fprintf(stderr, " ]\n");
+  fprintf(stderr, "st1=[");
+  for (int dim = 0; dim < 5; ++dim) { fprintf(stderr, " %lu", st1[dim]); }
+  fprintf(stderr, " ]\n");
+
+  fprintf(stderr, "n=%lu\n", n);
+#endif
+
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    for (size_t i1 = 0; i1 < X.dim_size[1]; ++i1) {
+      for (size_t i2 = 0; i2 < X.dim_size[2]; ++i2) {
+        uint64_t out = X.addr + (i0 * st0[0] + i1 * st0[1] + i2 * st0[2]) * sizeof(T);
+        uint64_t in0 = Y.addr + (i0 * st0[0] + i1 * st0[1] + i2 * st0[2]) * sizeof(T);
+        uint64_t in1 = Z.addr
+            + ((i0 % Z.dim_size[0]) * st1[0]
+                    + (i1 % Z.dim_size[1]) * st1[1]
+                    + (i2 % Z.dim_size[2]) * st1[2]) * sizeof(T);
+        op(out, in0, in1, n);
+      }
+    }
+  }
+
+  LOG(3) << __FUNCTION__ << " done";
+
+  return 0;
+}
+
 int op_add(const BinaryOpArgs& args) {
 
 //  printf("args.in0.dims = %ld\n", args.in0.dims) ;
@@ -284,8 +357,10 @@ int op_add(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
+    } else if (check_binop_dim5_x(args)) {
+      r = binop_dim5_x<float>(args.out, args.in0, args.in1, add_n1<float>);
     } else if (IsSameDims(args)) {
-      r = binop<float>(args.out, args.in0, args.in1,
+      r = binop_dimN<float>(args.out, args.in0, args.in1,
                        [](float y, float z) -> float { return y + z; });
     }
   
@@ -419,8 +494,10 @@ int op_sub(const BinaryOpArgs& args) {
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
+    } else if (check_binop_dim5_x(args)) {
+      r = binop_dim5_x<float>(args.out, args.in0, args.in1, sub_n1<float>);
     } else if (IsSameDims(args)) {
-      r = binop<float>(args.out, args.in0, args.in1,
+      r = binop_dimN<float>(args.out, args.in0, args.in1,
                        [](float y, float z) -> float { return y - z; });
     }
     return r;
@@ -555,10 +632,11 @@ int op_mul(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
-    } else if (args.in0.dims == args.in1.dims
-               && args.in0.dims == args.out.dims) {
-        r = binop<float>(args.out, args.in0, args.in1,
-                         [](float a, float b) -> float { return a * b; });
+    } else if (check_binop_dim5_x(args)) {
+      r = binop_dim5_x<float>(args.out, args.in0, args.in1, mul_n1<float>);
+    } else if (IsSameDims(args)) {
+      r = binop_dimN<float>(args.out, args.in0, args.in1,
+              [](float a, float b) -> float { return a * b; });
     }
 
     return r;
@@ -811,8 +889,8 @@ int op_div(const BinaryOpArgs& args) {
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
     } else if (IsSameDims(args)) {
-      r = binop<float>(args.out, args.in0, args.in1,
-                       [](float y, float z) -> float { return y / z; });
+      r = binop_dimN<float>(args.out, args.in0, args.in1,
+              [](float y, float z) -> float { return y / z; });
     }
     return r;
   }
@@ -1085,9 +1163,11 @@ int op_sqdiff(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
+    } else if (check_binop_dim5_x(args)) {
+      r = binop_dim5_x<float>(args.out, args.in0, args.in1, sqdiff_n1<float>);
     } else if (IsSameDims(args)) {
-         r = binop<float>(args.out, args.in0, args.in1,
-                          [](float y, float z) -> float { return (y-z)*(y-z); });
+         r = binop_dimN<float>(args.out, args.in0, args.in1,
+                 [](float y, float z) -> float { return (y-z)*(y-z); });
     }
 
     return r;
