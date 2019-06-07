@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cassert>
 #include "kernel.h"
 #include "types.h"
 #include "log.h"
@@ -89,6 +90,11 @@ bool CheckDimsAll(const BinaryOpArgs& args, size_t dims)
         && args.out.dims == dims;
 }
 
+bool IsSameDims(const BinaryOpArgs& args)
+{
+    return args.in0.dims == args.in1.dims
+        && args.in0.dims == args.out.dims;
+}
 
 int op_Binary(const void* args, size_t len, 
               int (*func)(const BinaryOpArgs&),
@@ -182,8 +188,9 @@ int add2_nn_1n(uint64_t out,
 
 // X = Y op Z
 template<typename T, typename F>
-int op3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
+int binop_dim3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
 {
+    LOG(3) << __FUNCTION__;
     T* px = reinterpret_cast<T*>(X.addr);
     T const* py = reinterpret_cast<T*>(Y.addr);
     T const* pz = reinterpret_cast<T*>(Z.addr);
@@ -205,10 +212,48 @@ int op3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
     return 0;
 }
 
-template <typename T>
-int add3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+// X = Y op Z
+template<typename T, typename F>
+int binop(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
 {
-    return op3<T>(X, Y, Z, [](T y, T z) -> float { return y + z; });
+    T* px = reinterpret_cast<T*>(X.addr);
+    T const* py = reinterpret_cast<T*>(Y.addr);
+    T const* pz = reinterpret_cast<T*>(Z.addr);
+
+    assert(X.dims == Y.dims && X.dims == Z.dims);
+
+    if (X.dims == 3)
+        return binop_dim3<T>(X, Y, Z, op);
+
+    LOG(3) << __FUNCTION__;
+
+    size_t dims = X.dims;
+
+    for (size_t ix = 0; ix < X.nelems; ++ix) {
+        size_t ix0[dims];
+        size_t tmp = ix;
+        for (int64_t dim = dims - 1; dim >= 0; --dim) {
+            ix0[dim] = tmp % X.dim_size[dim];
+            tmp /= X.dim_size[dim];
+        }
+        size_t iy = 0;
+        size_t iz = 0;
+        for (size_t dim = 0; dim < dims; ++dim) {
+            iy = (iy * Y.dim_size[dim]) + ix0[dim] % Y.dim_size[dim];
+            iz = (iz * Z.dim_size[dim]) + ix0[dim] % Z.dim_size[dim];
+        }
+
+        px[ix] = op(py[iy], pz[iz]);
+#ifdef DEBUG
+        fprintf(stderr, "ix=%lu[", ix);
+        for (int64_t dim = 0; dim < dims; ++dim)
+            fprintf(stderr, " %lu", ix0[dim]);
+        fprintf(stderr, " ]");
+        fprintf(stderr, " iy=%lu iz=%lu\n", iy, iz);
+#endif
+    }
+
+    return 0;
 }
 
 int op_add(const BinaryOpArgs& args) {
@@ -238,8 +283,9 @@ int op_add(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
-    } else if (CheckDimsAll(args, 3)) {
-      r = add3<float>(args.out, args.in0, args.in1);
+    } else if (IsSameDims(args)) {
+      r = binop<float>(args.out, args.in0, args.in1,
+                       [](float y, float z) -> float { return y + z; });
     }
   
     return r;
@@ -334,12 +380,6 @@ int sub2_nn_1n(uint64_t out,
   return 0;
 }
 
-template <typename T>
-int sub3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
-{
-    return op3<T>(X, Y, Z, [](T y, T z) -> float { return y - z; });
-}
-
 int op_sub(const BinaryOpArgs& args) {
 
 //  printf("args.in0.dims = %ld\n", args.in0.dims) ;
@@ -378,8 +418,9 @@ int op_sub(const BinaryOpArgs& args) {
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
-    } else if (CheckDimsAll(args, 3)) {
-      r = sub3<float>(args.out, args.in0, args.in1);
+    } else if (IsSameDims(args)) {
+      r = binop<float>(args.out, args.in0, args.in1,
+                       [](float y, float z) -> float { return y - z; });
     }
     return r;
   }
@@ -513,6 +554,10 @@ int op_mul(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
+    } else if (args.in0.dims == args.in1.dims
+               && args.in0.dims == args.out.dims) {
+        r = binop<float>(args.out, args.in0, args.in1,
+                         [](float a, float b) -> float { return a * b; });
     }
 
     return r;
@@ -732,13 +777,6 @@ inline int div2_nn_n1<float>(uint64_t out,
 }
 #endif
 
-template <typename T>
-int div3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
-{
-    return op3<T>(X, Y, Z, [](T y, T z) -> float { return y / z; });
-}
-
-
 int op_div(const BinaryOpArgs& args) {
 
 //  printf("args.in0.dims = %ld\n", args.in0.dims) ;
@@ -771,8 +809,9 @@ int op_div(const BinaryOpArgs& args) {
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
-    } else if (CheckDimsAll(args, 3)) {
-      r = div3<float>(args.out, args.in0, args.in1);
+    } else if (IsSameDims(args)) {
+      r = binop<float>(args.out, args.in0, args.in1,
+                       [](float y, float z) -> float { return y / z; });
     }
     return r;
   }
