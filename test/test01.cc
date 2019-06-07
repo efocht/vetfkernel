@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cstdio>
 #include <cstdint>
+#include <cstdlib>
 
 // copy from src/binary_ops.cc
 struct _Tensor {
@@ -57,19 +58,30 @@ template<typename T>
 class Tensor {
     public:
         Tensor(std::vector<size_t> const& shape) {
-            t = makeTensor<T>(shape.size(), shape);
+          shape_ = shape;
+          t = makeTensor<T>(shape.size(), shape);
+          stride_.resize(shape.size());
+          size_t dim = t.dims;
+          stride_[dim - 1] = 1;
+          for (int i = dim - 2; i >= 0; --i) {
+            stride_[i] = stride_[i + 1] * t.dim_size[i + 1];
+          }
         }
         ~Tensor() { delete[] reinterpret_cast<T*>(t.addr); }
+        std::vector<size_t> const& shape() const { return shape_; }
         T* data() { return reinterpret_cast<T*>(t.addr); }
         T const* data() const { return reinterpret_cast<T const*>(t.addr); }
         size_t nelems() const { return t.nelems; }
         size_t dims() const { return t.dims; }
         size_t dim_size(size_t i) const { return t.dim_size[i]; }
+        size_t stride(size_t i) const { return stride_[i]; }
 
         _Tensor tensor() const { return t; }
 
     private:
         _Tensor t;
+        std::vector<size_t> stride_;
+        std::vector<size_t> shape_;
 };
 
 template<typename T>
@@ -125,6 +137,8 @@ struct TestParam
 
 extern "C" {
     int op_Add(const void* args, size_t len);
+    int op_Sub(const void* args, size_t len);
+    int op_Mul(const void* args, size_t len);
 }
 
 template<typename T>
@@ -156,6 +170,61 @@ bool test_BinaryOp(TestParam const& param,
     return flag;
 }
 
+template <typename T, typename F>
+int ref_Binop(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z, F op,
+        T* pX, T const* pY, T const* pZ, int dim)
+{
+  //fprintf(stderr, "%s: dim=%d X.stride[%d]=%d\n", __FUNCTION__, dim, dim, X.stride(dim));
+  if (dim + 1 == X.dims()) {
+    for (size_t i = 0; i < X.dim_size(dim); ++i) {
+      T y = pY[i % Y.dim_size(dim)];
+      T z = pZ[i % Z.dim_size(dim)];
+      pX[i] = op(y, z);
+      //fprintf(stderr, "%s: %8.3f = %8.3f op %8.3f\n", __FUNCTION__, pX[i], y, z);
+    }
+  } else {
+    for (size_t i = 0; i < X.dim_size(dim); ++i) {
+#if 0
+      fprintf(stderr, "%s: dim=%d X.dim_size[%d]=%d i=%d %d %d\n",
+              __FUNCTION__, dim, dim, X.dim_size(dim), i, Y.dim_size(dim), Y.stride(dim));
+#endif
+      T* pX0 = pX + i * X.stride(dim);
+      T const* pY0 = pY + (i % Y.dim_size(dim)) * Y.stride(dim);
+      T const* pZ0 = pZ + (i % Z.dim_size(dim)) * Z.stride(dim);
+      ref_Binop(X, Y, Z, op, pX0, pY0, pZ0, dim + 1);
+    }
+  }
+  return 0;
+}
+
+template <typename T, typename F>
+int ref_Binop(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z, F op)
+{
+  return ref_Binop(X, Y, Z, op, X.data(), Y.data(), Z.data(), 0);
+}
+
+template <typename T>
+int ref_Add(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z)
+{
+  return ref_Binop(X, Y, Z, [](T y, T z) -> T { return y + z; },
+          X.data(), Y.data(), Z.data(), 0);
+}
+
+template <typename T>
+int ref_Sub(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z)
+{
+  return ref_Binop(X, Y, Z, [](T y, T z) -> T { return y - z; },
+          X.data(), Y.data(), Z.data(), 0);
+}
+
+template <typename T>
+int ref_Mul(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z)
+{
+  return ref_Binop(X, Y, Z, [](T y, T z) -> T { return y * z; },
+          X.data(), Y.data(), Z.data(), 0);
+}
+
+
 bool test_Add_01(TestParam const& param)
 {
     Tensor<float> out({1, 5, 10});
@@ -168,7 +237,6 @@ bool test_Add_01(TestParam const& param)
         for (size_t j = 0; j < 10; ++j) {
             out.data()[i * 10 + j] = 0;
             in0.data()[i * 10 + j] = c;
-            exp.data()[i * 10 + j] = c + j * 100;
             ++c;
         }
     }
@@ -178,6 +246,8 @@ bool test_Add_01(TestParam const& param)
             in1.data()[j] = j * 100;
         }
     }
+
+    ref_Add(exp, in0, in1);
 
     return test_BinaryOp(param, out, in0, in1, exp, op_Add);
 }
@@ -194,7 +264,7 @@ bool test_Add_02(TestParam const& param)
         for (size_t j = 0; j < 10; ++j) {
             out.data()[i * 10 + j] = 0;
             in0.data()[i * 10 + j] = c;
-            exp.data()[i * 10 + j] = c + i * 100;
+            //exp.data()[i * 10 + j] = c + i * 100;
             ++c;
         }
     }
@@ -204,6 +274,8 @@ bool test_Add_02(TestParam const& param)
             in1.data()[i] = i * 100;
         }
     }
+
+    ref_Add(exp, in0, in1);
 
     return test_BinaryOp(param, out, in0, in1, exp, op_Add);
 }
@@ -229,15 +301,45 @@ bool test_Add_03(TestParam const& param)
         in1.data()[i] = i * 100;
     }
 
-    for (size_t i = 0; i < 2; ++i) {
-        for (size_t j = 0; j < 3; ++j) {
-            for (size_t k = 0; k < 10; ++k) {
-                exp.data()[i * 3 * 10 + j * 10 + k] = i * 10 + k + j * 100;
-            }
-        }
-    }
-
+    ref_Add(exp, in0, in1);
     return test_BinaryOp(param, out, in0, in1, exp, op_Add);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_04(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({8, 16, 16, 32, 32});
+    Tensor<T> in0({8, 16, 16, 32, 32});
+    Tensor<T> in1({1, 16, 16, 1, 1});
+    Tensor<T> exp({8, 16, 16, 32, 32});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+bool test_Add_04(TestParam const& param)
+{
+  return test_BinaryOp_04<float>(param, ref_Add<float>, op_Add);
+}
+
+bool test_Sub_04(TestParam const& param)
+{
+  return test_BinaryOp_04<float>(param, ref_Sub<float>, op_Sub);
+}
+
+bool test_Mul_04(TestParam const& param)
+{
+  return test_BinaryOp_04<float>(param, ref_Mul<float>, op_Mul);
 }
 
 
@@ -259,6 +361,9 @@ int main(int argc, char* argv[])
         "op_Add_01", test_Add_01,
         "op_Add_02", test_Add_02,
         "op_Add_03", test_Add_03,
+        "op_Add_04", test_Add_04,
+        "op_Sub_04", test_Sub_04,
+        "op_Mul_04", test_Mul_04,
     };
 
     TestParam param;
