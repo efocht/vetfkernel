@@ -184,6 +184,101 @@ DEFINE_KERNEL(Cast, op_cast);
 //
 
 namespace {
+
+template<typename T>
+int tile_dim3(Tensor const& X, Tensor const& Y)
+{
+  LOG(3) << __FUNCTION__;
+  T* px = reinterpret_cast<T*>(X.addr);
+  T const* py = reinterpret_cast<T*>(Y.addr);
+
+  int64_t const* sx = X.dim_size;
+  int64_t const* sy = Y.dim_size;
+
+  for (size_t i0 = 0; i0 < sx[0]; ++i0) {
+    const size_t ix0 = i0 ;
+    const size_t iy0 = i0 % sy[0] ;
+    for (size_t i1 = 0; i1 < sx[1]; ++i1) {
+      const size_t ix1 = ix0 * sx[1] + i1 ;
+      const size_t iy1 = iy0 * sy[1] + (i1 % sy[1]) ;
+      for (size_t i2 = 0; i2 < sx[2]; ++i2) {
+	const size_t ix2 = ix1 * sx[2] + i2 ;
+	const size_t iy2 = iy1 * sy[2] + (i2 % sy[2]) ;
+	px[ix2] = py[iy2] ;
+      }
+    }
+  }
+
+  return 0;
+}
+
+template<typename T>
+int tile_dim4(Tensor const& Y, Tensor const& X)
+{
+  LOG(3) << __FUNCTION__;
+  T* px = reinterpret_cast<T*>(X.addr);
+  T const* py = reinterpret_cast<T*>(Y.addr);
+
+  int64_t const* sx = X.dim_size;
+  int64_t const* sy = Y.dim_size;
+
+  for (size_t i0 = 0; i0 < sx[0]; ++i0) {
+    const size_t ix0 = i0 ;
+    const size_t iy0 = i0 % sy[0] ;
+    for (size_t i1 = 0; i1 < sx[1]; ++i1) {
+      const size_t ix1 = ix0 * sx[1] + i1 ;
+      const size_t iy1 = iy0 * sy[1] + (i1 % sy[1]) ;
+      for (size_t i2 = 0; i2 < sx[2]; ++i2) {
+	const size_t ix2 = ix1 * sx[2] + i2 ;
+	const size_t iy2 = iy1 * sy[2] + (i2 % sy[2]) ;
+	for (size_t i3 = 0; i3 < sx[3]; ++i3) {
+	  const size_t ix3 = ix2 * sx[3] + i3 ;
+	  const size_t iy3 = iy2 * sy[3] + (i3 % sy[3]) ;
+	  px[ix3] = py[iy3] ;
+	}
+      }
+    }
+  }
+
+  return 0;
+}
+
+template<typename T>
+int tile_dim5(Tensor const& Y, Tensor const& X)
+{
+  LOG(3) << __FUNCTION__;
+  T* px = reinterpret_cast<T*>(X.addr);
+  T const* py = reinterpret_cast<T*>(Y.addr);
+
+  int64_t const* sx = X.dim_size;
+  int64_t const* sy = Y.dim_size;
+
+  for (size_t i0 = 0; i0 < sx[0]; ++i0) {
+    const size_t ix0 = i0 ;
+    const size_t iy0 = i0 % sy[0] ;
+    for (size_t i1 = 0; i1 < sx[1]; ++i1) {
+      const size_t ix1 = ix0 * sx[1] + i1 ;
+      const size_t iy1 = iy0 * sy[1] + (i1 % sy[1]) ;
+      for (size_t i2 = 0; i2 < sx[2]; ++i2) {
+	const size_t ix2 = ix1 * sx[2] + i2 ;
+	const size_t iy2 = iy1 * sy[2] + (i2 % sy[2]) ;
+	for (size_t i3 = 0; i3 < sx[3]; ++i3) {
+	  const size_t ix3 = ix2 * sx[3] + i3 ;
+	  const size_t iy3 = iy2 * sy[3] + (i3 % sy[3]) ;
+	  for (size_t i4 = 0; i4 < sx[4]; ++i4) {
+	    const size_t ix4 = ix3 * sx[4] + i4 ;
+	    const size_t iy4 = iy3 * sy[4] + (i4 % sy[4]) ;
+	    px[ix4] = py[iy4] ;
+	  }
+	}
+      }
+    }
+  }
+
+  return 0;
+}
+
+
 int op_tile(const VEOpArgs& args)
 {
   if (args.nVariables() != 2)
@@ -195,10 +290,13 @@ int op_tile(const VEOpArgs& args)
     << " ti=" << ti->to_s()
     << " to=" << to->to_s();
 
+  int rc = 1 ;
+
 //  printf("ti->dims = %ld\n", ti->dims) ;
 //  for(int i=0; i<ti->dims ; i++ ) printf(" [%d] = %ld\n", i, ti->dim_size[i]) ;
 //  printf("to->dims = %ld\n", to->dims) ;
 //  for(int i=0; i<to->dims ; i++ ) printf(" [%d] = %ld\n", i, to->dim_size[i]) ;
+//  fflush(stdout) ;
 
   if (ti->dtype == DT_FLOAT && to->dtype == DT_FLOAT) {
     const float* pi = reinterpret_cast<const float*>(ti->addr);
@@ -207,6 +305,7 @@ int op_tile(const VEOpArgs& args)
       for (size_t i = 0; i < to->nelems; ++i) {
         po[i] = pi[0];
       }
+      rc = 0 ;
     } else if (ti->dims == 2 && to->dims == 2
                && ti->dim_size[0] == to->dim_size[0]
                && ti->dim_size[1] == 1) {
@@ -215,6 +314,7 @@ int op_tile(const VEOpArgs& args)
           po[i * to->dim_size[1] + j] = pi[i];
         }
       }
+      rc = 0 ;
     } else if (ti->dims == 2 && to->dims == 2
                && ti->dim_size[1] == to->dim_size[1]
                && ti->dim_size[0] == 1) {
@@ -223,13 +323,17 @@ int op_tile(const VEOpArgs& args)
           po[i * to->dim_size[1] + j] = pi[j];
         }
       }
-    } else 
-      return 1;
-  } else {
-    return 1;
+      rc = 0 ;
+    } else if ( ti->dims == to->dims && ti->dims == 3 ) {
+      rc = tile_dim3<float>(*to, *ti) ;
+    } else if ( ti->dims == to->dims && ti->dims == 4 ) {
+      rc = tile_dim4<float>(*to, *ti) ;
+    } else if ( ti->dims == to->dims && ti->dims == 5 ) {
+      rc = tile_dim5<float>(*to, *ti) ;
+    }
   }
 
-  return 0;
+  return rc;
 }
 } // namespace
 
