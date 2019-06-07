@@ -350,6 +350,48 @@ int mean_d2a1(uint64_t out, uint64_t in, size_t dim0, size_t dim1)
 
   return 0;
 }
+
+template <typename T>
+int mean_d3a1(uint64_t out, uint64_t in, size_t dim0, size_t dim1, size_t dim2)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi = reinterpret_cast<const T*>(in);
+
+  size_t dim12 = dim1 * dim2;
+
+  for (size_t i = 0; i < dim0; ++i) {
+    for (size_t k = 0; k < dim2; ++k) {
+      T s = T(0);
+      for (size_t j = 0; j < dim1; ++j) {
+        s += pi[i * dim12 + j * dim2 + k];
+      }
+      po[i * dim2 + k] = s / dim1 ;
+    }
+  }
+
+  return 0;
+}
+
+template <typename T>
+int mean_d3a02(uint64_t out, uint64_t in, size_t dim0, size_t dim1, size_t dim2)
+{
+  T* po = reinterpret_cast<T*>(out);
+  const T* pi = reinterpret_cast<const T*>(in);
+
+  size_t dim12 = dim1 * dim2;
+
+  for (size_t j = 0; j < dim1; ++j) {
+    T s = T(0);
+    for (size_t i = 0; i < dim0; ++i) {
+      for (size_t k = 0; k < dim2; ++k) {
+        s += pi[i * dim12 + j * dim2 + k];
+      }
+    }
+    po[j] = s / (dim0*dim2);
+  }
+
+  return 0;
+}
 } // namespace
 
 
@@ -369,7 +411,7 @@ int op_Mean(const void* args, size_t len)
   CHECK_ARG_LEN(len, sizeof(Args));
   p = reinterpret_cast<const Args*>(args);
 
-  int ret = 1;
+  int ret = 0;
 
   LOG(3) << __FUNCTION__
     << ": dtype=" << p->dtype
@@ -378,13 +420,17 @@ int op_Mean(const void* args, size_t len)
 
 
   if (p->dtype == DT_FLOAT) {
-    if (p->ndims == 2 ) {
-      if ( p->axis == 1 ) {
-        ret = mean_d2a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
-      }
-      else if ( p->axis == 0) {
-        ret = mean_d2a0<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
-      }
+    if (p->ndims == 2 && p->axis == 1) {
+      ret = mean_d2a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+    }
+    if (p->ndims == 2 && p->axis == 0) {
+      ret = mean_d2a0<float>(p->out, p->in, p->dim_size[0], p->dim_size[1]);
+    }
+    if (p->ndims == 3 && p->axis == 1) {
+      ret = mean_d3a1<float>(p->out, p->in, p->dim_size[0], p->dim_size[1], p->dim_size[2]);
+    }
+    if (p->ndims == 3 && p->axis == 0) {
+      ret = mean_d3a02<float>(p->out, p->in, p->dim_size[0], p->dim_size[1], p->dim_size[2]);
     }
   }
 
