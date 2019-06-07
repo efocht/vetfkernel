@@ -204,7 +204,7 @@ int binop_dim3(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
             for (size_t i2 = 0; i2 < sx[2]; ++i2) {
                 px[i0 * sx[1] * sx[2] + i1 * sx[2] + i2]
                     = op(py[(i0 % sy[0]) * sy[1] * sy[2] + (i1 % sy[1]) * sy[2] + (i2 % sy[2])],
-                         pz[(i1 % sz[0]) * sz[1] * sz[2] + (i1 % sz[1]) * sz[2] + (i2 % sz[2])]);
+                         pz[(i0 % sz[0]) * sz[1] * sz[2] + (i1 % sz[1]) * sz[2] + (i2 % sz[2])]);
             }
         }
     }
