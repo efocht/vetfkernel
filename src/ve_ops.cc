@@ -212,6 +212,37 @@ int tile_dim3(Tensor const& X, Tensor const& Y)
   return 0;
 }
 
+// X = TILE(Y)
+// X = [d0, d1, d2, d3]
+// Y = [e0, e1, 1, 1]
+template<typename T>
+int tile_dim4_11(Tensor const& X, Tensor const& Y)
+{
+  LOG(3) << __FUNCTION__;
+  T* px = reinterpret_cast<T*>(X.addr);
+  T const* py = reinterpret_cast<T*>(Y.addr);
+
+  int64_t const* sx = X.dim_size;
+  int64_t const* sy = Y.dim_size;
+
+#pragma _NEC novector
+  for (size_t i0 = 0; i0 < sx[0]; ++i0) {
+    const size_t ix0 = i0 ;
+    const size_t iy0 = i0 % sy[0] ;
+#pragma _NEC novector
+    for (size_t i1 = 0; i1 < sx[1]; ++i1) {
+      const size_t ix1 = ix0 * sx[1] + i1 ;
+      const size_t iy1 = iy0 * sy[1] + (i1 % sy[1]) ;
+      for (size_t i23 = 0; i23 < sx[2] * sx[3] ; ++i23) {
+	const size_t ix23 = ix1 * sx[2] * sx[3] + i23 ;
+	px[ix23] = py[iy1] ;
+      }
+    }
+  }
+
+  return 0;
+}
+
 template<typename T>
 int tile_dim4(Tensor const& X, Tensor const& Y)
 {
@@ -235,6 +266,42 @@ int tile_dim4(Tensor const& X, Tensor const& Y)
 	  const size_t ix3 = ix2 * sx[3] + i3 ;
 	  const size_t iy3 = iy2 * sy[3] + (i3 % sy[3]) ;
 	  px[ix3] = py[iy3] ;
+	}
+      }
+    }
+  }
+
+  return 0;
+}
+
+// X = TILE(Y)
+// X = [d0, d1, d2, d3, d4]
+// Y = [e0, e1, e2, 1, 1]
+template<typename T>
+int tile_dim5_11(Tensor const& X, Tensor const& Y)
+{
+  LOG(3) << __FUNCTION__;
+  T* px = reinterpret_cast<T*>(X.addr);
+  T const* py = reinterpret_cast<T*>(Y.addr);
+
+  int64_t const* sx = X.dim_size;
+  int64_t const* sy = Y.dim_size;
+
+#pragma _NEC novector
+  for (size_t i0 = 0; i0 < sx[0]; ++i0) {
+    const size_t ix0 = i0 ;
+    const size_t iy0 = i0 % sy[0] ;
+#pragma _NEC novector
+    for (size_t i1 = 0; i1 < sx[1]; ++i1) {
+      const size_t ix1 = ix0 * sx[1] + i1 ;
+      const size_t iy1 = iy0 * sy[1] + (i1 % sy[1]) ;
+#pragma _NEC novector
+      for (size_t i2 = 0; i2 < sx[2]; ++i2) {
+	const size_t ix2 = ix1 * sx[2] + i2 ;
+	const size_t iy2 = iy1 * sy[2] + (i2 % sy[2]) ;
+	for (size_t i34 = 0; i34 < sx[3] * sx[4] ; ++i34) {
+	  const size_t ix34 = ix2 * sx[3] * sx[4] + i34 ;
+	  px[ix34] = py[iy2] ;
 	}
       }
     }
@@ -327,9 +394,19 @@ int op_tile(const VEOpArgs& args)
     } else if ( ti->dims == to->dims && ti->dims == 3 ) {
       rc = tile_dim3<float>(*to, *ti) ;
     } else if ( ti->dims == to->dims && ti->dims == 4 ) {
-      rc = tile_dim4<float>(*to, *ti) ;
+      if( ti->dim_size[2]==1 && ti->dim_size[3]==1 ) {
+	rc = tile_dim4_11<float>(*to, *ti) ;
+      }
+      else {
+	rc = tile_dim4<float>(*to, *ti) ;
+      }
     } else if ( ti->dims == to->dims && ti->dims == 5 ) {
-      rc = tile_dim5<float>(*to, *ti) ;
+      if( ti->dim_size[3]==1 && ti->dim_size[4]==1 ) {
+	rc = tile_dim5_11<float>(*to, *ti) ;
+      }
+      else {
+	rc = tile_dim5<float>(*to, *ti) ;
+      }
     }
   }
 
