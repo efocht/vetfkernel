@@ -213,7 +213,7 @@ int tile_dim3(Tensor const& X, Tensor const& Y)
 }
 
 template<typename T>
-int tile_dim4(Tensor const& Y, Tensor const& X)
+int tile_dim4(Tensor const& X, Tensor const& Y)
 {
   LOG(3) << __FUNCTION__;
   T* px = reinterpret_cast<T*>(X.addr);
@@ -244,7 +244,7 @@ int tile_dim4(Tensor const& Y, Tensor const& X)
 }
 
 template<typename T>
-int tile_dim5(Tensor const& Y, Tensor const& X)
+int tile_dim5(Tensor const& X, Tensor const& Y)
 {
   LOG(3) << __FUNCTION__;
   T* px = reinterpret_cast<T*>(X.addr);
