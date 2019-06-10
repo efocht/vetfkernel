@@ -311,6 +311,7 @@ int binop_dim5_x(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
   fprintf(stderr, "n=%lu\n", n);
 #endif
 
+#if 0
   for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
     for (size_t i1 = 0; i1 < X.dim_size[1]; ++i1) {
       for (size_t i2 = 0; i2 < X.dim_size[2]; ++i2) {
@@ -324,6 +325,22 @@ int binop_dim5_x(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
       }
     }
   }
+#else	// use openmp
+#pragma omp parallel for
+  for (size_t i012 = 0; i012 < X.dim_size[0] * X.dim_size[1] * X.dim_size[2] ; ++i012) {
+    size_t i0 = i012 / (X.dim_size[1] * X.dim_size[2]) ;
+    size_t i1 = (i012 % (X.dim_size[1] * X.dim_size[2])) / X.dim_size[2] ;
+    size_t i2 = (i012 % X.dim_size[2]) ;
+
+    uint64_t out = X.addr + (i0 * st0[0] + i1 * st0[1] + i2 * st0[2]) * sizeof(T);
+    uint64_t in0 = Y.addr + (i0 * st0[0] + i1 * st0[1] + i2 * st0[2]) * sizeof(T);
+    uint64_t in1 = Z.addr
+	+ ((i0 % Z.dim_size[0]) * st1[0]
+		+ (i1 % Z.dim_size[1]) * st1[1]
+		+ (i2 % Z.dim_size[2]) * st1[2]) * sizeof(T);
+    op(out, in0, in1, n);
+  }
+#endif
 
   LOG(3) << __FUNCTION__ << " done";
 
