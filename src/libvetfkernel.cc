@@ -147,6 +147,8 @@ uint64_t vetfkl_entry(const void* arg, size_t len)
   int32_t num_kernels = *reinterpret_cast<int32_t*>(curr);
   curr += sizeof(int32_t);
 
+  LOG(3) << __FUNCTION__ << ": num_kernels=" << num_kernels;
+
 #if 0
   fprintf(stderr, "%s: num_kernels=%d\n", __FUNCTION__, num_kernels);
 #endif
@@ -162,19 +164,24 @@ uint64_t vetfkl_entry(const void* arg, size_t len)
     const void* arg0 = reinterpret_cast<const void*>(curr);
     curr += len0;
 
+    LOG(3) << __FUNCTION__ << ": i=" << i << "/" << num_kernels;
 #if 0
     fprintf(stderr, "vetfkl_entry: i=%d/%d func=%p args0=%p len=%lu\n",
             i, num_kernels, func, arg0, len0);
 #endif
     int ret = func(arg0, len0);
+    LOG(3) <<  __FUNCTION__ << ": i=" << i << "/" << num_kernels << " ret=" << ret;
 #if 0
     fprintf(stderr, "vetfkl_entry: ret=%d\n", ret);
 #endif
     if (ret != 0) {
+      LOG(3) << __FUNCTION__ << ": return error. i=" << i << " ret=" << ret;
       uint64_t retval = ((uint64_t)i) << 32 | ret;
       return retval;
     }
   }
+
+  LOG(3) << __FUNCTION__ << ": end. ret=0";
 #if 0
   fprintf(stderr, "vetfkl_entry: end\n");
 #endif

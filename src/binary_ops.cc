@@ -4,12 +4,24 @@
 #include "types.h"
 #include "log.h"
 #include <sstream>
+#include <vector>
 
 #define LIBVETF_INTRINSIC
 
 #ifdef LIBVETF_INTRINSIC
 #include "libvetfkernel.h"
 #endif
+
+//#define TIMER
+#ifdef TIMER
+#include "timer.h"
+#endif
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+//#define DEBUG
 
 REGISTER_KERNEL("Add", "op_Add");
 REGISTER_KERNEL("Sub", "op_Sub");
@@ -96,29 +108,47 @@ bool IsSameDims(const BinaryOpArgs& args)
         && args.in0.dims == args.out.dims;
 }
 
+bool check_dim(_Tensor const& s, std::vector<int64_t> const& dim)
+{
+  return s.dims == dim.size()
+      && s.dim_size[0] == dim[0]
+      && s.dim_size[1] == dim[1]
+      && s.dim_size[2] == dim[2]
+      && s.dim_size[3] == dim[3]
+      && s.dim_size[4] == dim[4];
+}
+
 int op_Binary(const void* args, size_t len, 
               int (*func)(const BinaryOpArgs&),
               const char* name)
 {
-  LOG(2) << name << ": begin";
+  LOG(2) << __FUNCTION__ << "::" << name << ": begin";
   int ret = 1;
 
   if (sizeof(BinaryOpArgs) == len) {
     const BinaryOpArgs* p = reinterpret_cast<const BinaryOpArgs*>(args);
 
-    LOG(3) << name << ":"
+    LOG(1) << __FUNCTION__ << "::" << name << ":"
       << " in0=" << p->in0.to_s()
       << " in1=" << p->in1.to_s()
       << " out=" << p->out.to_s();
 
-    if (func)
+    if (func) {
+#ifdef TIMER
+      double t0 = second();
+#endif
       ret = func(*p);
+#ifdef TIMER
+      double ms = (second() - t0) * 1e3;
+      LOG(1) << __FUNCTION__ << "::" << name << ": " << ms << " msec";
+#endif
+    }
   } else {
     LOG(3) << name << ": illegal args size " << len
       << " bytes. but " << sizeof(BinaryOpArgs) << " bytes expected";
   }
 
-  LOG(2) << name << ": end. ret=" << ret;
+  LOG(2) << __FUNCTION__ << "::" << name << ": end. ret=" << ret;
   return ret;
 }
 
@@ -230,28 +260,32 @@ int binop_dimN(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
 
     size_t dims = X.dims;
 
-    for (size_t ix = 0; ix < X.nelems; ++ix) {
-        size_t ix0[dims];
-        size_t tmp = ix;
-        for (int64_t dim = dims - 1; dim >= 0; --dim) {
-            ix0[dim] = tmp % X.dim_size[dim];
-            tmp /= X.dim_size[dim];
-        }
-        size_t iy = 0;
-        size_t iz = 0;
+    size_t stX[dims];
+    stX[dims - 1] = 1;
 #pragma _NEC novector
-        for (size_t dim = 0; dim < dims; ++dim) {
-            iy = (iy * Y.dim_size[dim]) + ix0[dim] % Y.dim_size[dim];
-            iz = (iz * Z.dim_size[dim]) + ix0[dim] % Z.dim_size[dim];
-        }
+    for (int dim = dims - 2; dim >= 0; --dim) {
+      stX[dim] = stX[dim + 1] * X.dim_size[dim + 1];
+    }
 
-        px[ix] = op(py[iy], pz[iz]);
 #ifdef DEBUG
-        fprintf(stderr, "ix=%lu[", ix);
-        for (int64_t dim = 0; dim < dims; ++dim)
-            fprintf(stderr, " %lu", ix0[dim]);
-        fprintf(stderr, " ]");
-        fprintf(stderr, " iy=%lu iz=%lu\n", iy, iz);
+    for (int dim = 0; dim < dims; ++dim)
+      LOG(3) << __FUNCTION__ << " stX[" << dim << "]=" << stX[dim];
+#endif
+
+    for (size_t ix = 0; ix < X.nelems; ++ix) {
+      size_t tmp = ix;
+      size_t iy = 0;
+      size_t iz = 0;
+#pragma _NEC novector
+      for (size_t dim = 0; dim < dims; ++dim) {
+        size_t tmp1 = tmp / stX[dim];
+        iy = (iy * Y.dim_size[dim]) + tmp1 % Y.dim_size[dim];
+        iz = (iz * Z.dim_size[dim]) + tmp1 % Z.dim_size[dim];
+        tmp = tmp % stX[dim];
+      }
+      px[ix] = op(py[iy], pz[iz]);
+#ifdef DEBUG
+      LOG(3) << __FUNCTION__ << " ix=" << ix << " iy=" << iy << " iz=" << iz;
 #endif
     }
 
@@ -264,12 +298,8 @@ int binop_dimN(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
 // Z = [e0, e1, e2, 1, 1]
 // di >= ei
 
-bool check_binop_dim5_x(const BinaryOpArgs& args)
+bool check_binop_dim5_x(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
 {
-  _Tensor const& X = args.out;
-  _Tensor const& Y = args.in0;
-  _Tensor const& Z = args.in1;
-
   return X.dims == 5 && Y.dims == 5 && Z.dims == 5
       && X.dim_size[0] == Y.dim_size[0]
       && X.dim_size[1] == Y.dim_size[1]
@@ -342,10 +372,55 @@ int binop_dim5_x(_Tensor const& X, _Tensor const& Y, _Tensor const& Z, F op)
   }
 #endif
 
-  LOG(3) << __FUNCTION__ << " done";
+  LOG(4) << __FUNCTION__ << " done";
 
   return 0;
 }
+
+template <typename T>
+int add_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  size_t n = 16 * 64 * 8 * 8;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX = pX0 + i0 * n;
+    T const* pY = pY0 + i0 * n;
+    T const* pZ = pZ0;
+    for (size_t i = 0; i < n; ++i) {
+      pX[i] = pY[i] + pZ[i / 64];
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
+template <typename T>
+int add_8x16x64x8x8_8x16x64x8x8_1x1x64x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  size_t n = 16 * 64 * 8 * 8;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX = pX0 + i0 * n;
+    T const* pY = pY0 + i0 * n;
+    T const* pZ = pZ0;
+    for (size_t i = 0; i < n; ++i) {
+      pX[i] = pY[i] + pZ[(i % (64 * 8 * 8)) / 64];
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
 
 int op_add(const BinaryOpArgs& args) {
 
@@ -374,7 +449,15 @@ int op_add(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
-    } else if (check_binop_dim5_x(args)) {
+    } else if (check_dim(args.out, {8, 16, 64, 8, 8})
+            && check_dim(args.in0, {8, 16, 64, 8, 8})
+            && check_dim(args.in1, {1, 16, 64, 1, 1})) {
+      r = add_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_dim(args.out, {8, 16, 64, 8, 8})
+            && check_dim(args.in0, {8, 16, 64, 8, 8})
+            && check_dim(args.in1, {1,  1, 64, 1, 1})) {
+      r = add_8x16x64x8x8_8x16x64x8x8_1x1x64x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_binop_dim5_x(args.out, args.in0, args.in1)) {
       r = binop_dim5_x<float>(args.out, args.in0, args.in1, add_n1<float>);
     } else if (IsSameDims(args)) {
       r = binop_dimN<float>(args.out, args.in0, args.in1,
@@ -473,6 +556,42 @@ int sub2_nn_1n(uint64_t out,
   return 0;
 }
 
+template <typename T, int M, int N>
+int sub_MxN_1xN_MxN(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(3) << __FUNCTION__;
+  T* x = reinterpret_cast<T*>(X.addr);
+  T const* y = reinterpret_cast<T const*>(Y.addr);
+  T const* z = reinterpret_cast<T const*>(Z.addr);
+
+  for (int i = 0; i < M*N; ++i) {
+    x[i] = y[i % N] - z[i];
+  }
+  return 0;
+}
+
+template <typename T>
+int sub_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  size_t n = 16 * 64 * 8 * 8;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX = pX0 + i0 * n;
+    T const* pY = pY0 + i0 * n;
+    T const* pZ = pZ0;
+    for (size_t i = 0; i < n; ++i) {
+      pX[i] = pY[i] - pZ[i / 64];
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
 int op_sub(const BinaryOpArgs& args) {
 
 //  printf("args.in0.dims = %ld\n", args.in0.dims) ;
@@ -511,11 +630,29 @@ int op_sub(const BinaryOpArgs& args) {
                                args.in1.addr,
                                args.in0.dim_size[0],
                                args.in0.dim_size[1]);
-    } else if (check_binop_dim5_x(args)) {
+    } else if (check_dim(args.out, {8, 16, 64, 8, 8})
+            && check_dim(args.in0, {8, 16, 64, 8, 8})
+            && check_dim(args.in1, {1, 16, 64, 1, 1})) {
+      r = sub_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_binop_dim5_x(args.out, args.in0, args.in1)) {
       r = binop_dim5_x<float>(args.out, args.in0, args.in1, sub_n1<float>);
     } else if (IsSameDims(args)) {
-      r = binop_dimN<float>(args.out, args.in0, args.in1,
-                       [](float y, float z) -> float { return y - z; });
+      if (check_dim(args.out, {1, 16, 64, 1, 1})
+              && check_dim(args.in0, {1, 1, 64, 1, 1})
+              && check_dim(args.in1, {1, 16, 64, 1, 1})) {
+        r = sub_MxN_1xN_MxN<float, 16, 64>(args.out, args.in0, args.in1);
+      } else if (check_dim(args.out, {1, 16, 32, 1, 1})
+              && check_dim(args.in0, {1,  1, 32, 1, 1})
+              && check_dim(args.in1, {1, 16, 32, 1, 1})) {
+        r = sub_MxN_1xN_MxN<float, 16, 32>(args.out, args.in0, args.in1);
+      } else if (check_dim(args.out, {1, 16, 16, 1, 1})
+              && check_dim(args.in0, {1,  1, 16, 1, 1})
+              && check_dim(args.in1, {1, 16, 16, 1, 1})) {
+        r = sub_MxN_1xN_MxN<float, 16, 16>(args.out, args.in0, args.in1);
+      } else {
+        r = binop_dimN<float>(args.out, args.in0, args.in1,
+                [](float y, float z) -> float { return y - z; });
+      }
     }
     return r;
   }
@@ -563,7 +700,23 @@ int mul_nn(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 template <>
 inline int mul_nn<float>(uint64_t out, uint64_t in0, uint64_t in1, size_t n)
 {
-  return mul_nn_f32(out, in0, in1, n) ;
+  if (n > 1024 * 1024) { // Tekito
+#pragma omp parallel
+    {
+      // TODO: align chunk for pack
+      int t = omp_get_thread_num();
+      int nt = omp_get_num_threads();
+      int64_t chunk = (n + nt - 1) / nt;
+      uint64_t d = chunk * t * sizeof(float);
+      if (chunk * (t + 1) > n)
+        chunk = n - chunk * t;
+      if (chunk > 0)
+        mul_nn_f32(out + d, in0 + d, in1 + d, chunk);
+    }
+    return 0;
+  } else {
+    return mul_nn_f32(out, in0, in1, n) ;
+  }
 }
 #endif
 
@@ -605,6 +758,179 @@ int mul2_nn_1n(uint64_t out,
   }
   return 0;
 }
+
+template <typename T, int M, int N>
+int mul_MxN_1xN_MxN(_Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  T* x = reinterpret_cast<T*>(X.addr);
+  T const* y = reinterpret_cast<T const*>(Y.addr);
+  T const* z = reinterpret_cast<T const*>(Z.addr);
+
+  for (int i = 0; i < M*N; ++i) {
+    x[i] = y[i % N] * z[i];
+  }
+  return 0;
+}
+
+
+template <typename T>
+int mul_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  size_t n = 16 * 64 * 8 * 8;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX = pX0 + i0 * n;
+    T const* pY = pY0 + i0 * n;
+    T const* pZ = pZ0;
+    for (size_t i = 0; i < n; ++i) {
+      pX[i] = pY[i] * pZ[i / 64];
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
+template <typename T>
+int mul_8x16x64x8x8_8x16x64x8x8_1x1x64x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  size_t n = 16 * 64 * 8 * 8;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX = pX0 + i0 * n;
+    T const* pY = pY0 + i0 * n;
+    T const* pZ = pZ0;
+    for (size_t i = 0; i < n; ++i) {
+      pX[i] = pY[i] * pZ[(i % (64 * 8 * 8)) / 64];
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
+template <typename T>
+int mul_8x16x32x16x16_8x16x32x16x16_1x16x32x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX1 = pX0 + i0 * 16 * 32 * 16 * 16;
+    T const* pY1 = pY0 + i0 * 16 * 32 * 16 * 16;
+    T const* pZ = pZ0;
+#pragma _NEC novector
+    for (size_t i = 0; i < 16 * 32; ++i) {
+      T* pX = pX1 + i * 16 * 16;
+      T const* pY = pY1 + i * 16 * 16;
+      for (size_t j = 0; j < 16 * 16; ++j) {
+        pX[j] = pY[j] * pZ[i];
+      }
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
+template <typename T>
+int mul_8x16x16x32x32_8x16x16x32x32_1x16x16x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX1 = pX0 + i0 * 16 * 16 * 32 * 32;
+    T const* pY1 = pY0 + i0 * 16 * 16 * 32 * 32;
+    T const* pZ = pZ0;
+#pragma _NEC novector
+    for (size_t i = 0; i < 16 * 16; ++i) {
+      T* pX = pX1 + i * 32 * 32;
+      T const* pY = pY1 + i * 32 * 32;
+#if 1 // faster?
+      for (size_t j = 0; j < 32 * 32; ++j) {
+        pX[j] = pY[j] * pZ[i];
+      }
+#else
+      mul_n1<T>(reinterpret_cast<uint64_t>(pX),
+              reinterpret_cast<uint64_t>(pY),
+              reinterpret_cast<uint64_t>(pZ + i),
+              16 * 16);
+#endif
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
+template <typename T>
+int mul_8x16x32x16x16_8x16x32x16x16_1x1x32x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX1 = pX0 + i0 * 16 * 32 * 16 * 16;
+    T const* pY1 = pY0 + i0 * 16 * 32 * 16 * 16;
+    T const* pZ = pZ0;
+#pragma _NEC novector
+    for (size_t i = 0; i < 16 * 32; ++i) {
+      T* pX = pX1 + i * 16 * 16;
+      T const* pY = pY1 + i * 16 * 16;
+      T z = pZ[i % 32];
+      for (size_t j = 0; j < 16 * 16; ++j) {
+        pX[j] = pY[j] * z;
+      }
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
+template <typename T>
+int mul_8x16x16x32x32_8x16x16x32x32_1x1x16x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX1 = pX0 + i0 * 16 * 16 * 32 * 32;
+    T const* pY1 = pY0 + i0 * 16 * 16 * 32 * 32;
+    T const* pZ = pZ0;
+#pragma _NEC novector
+    for (size_t i = 0; i < 16 * 16; ++i) {
+      T* pX = pX1 + i * 32 * 32;
+      T const* pY = pY1 + i * 32 * 32;
+      T z = pZ[i % 16];
+      for (size_t j = 0; j < 32 * 32; ++j) {
+        pX[j] = pY[j] * z;
+      }
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
 
 int op_mul(const BinaryOpArgs& args) {
 
@@ -649,7 +975,47 @@ int op_mul(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
-    } else if (check_binop_dim5_x(args)) {
+    } else if (check_dim(args.out, {8, 16, 64, 8, 8})
+            && check_dim(args.in0, {8, 16, 64, 8, 8})
+            && check_dim(args.in1, {1, 16, 64, 1, 1})) {
+      r = mul_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_dim(args.out, {8, 16, 64, 8, 8})
+            && check_dim(args.in0, {8, 16, 64, 8, 8})
+            && check_dim(args.in1, {1,  1, 64, 1, 1})) {
+      r = mul_8x16x64x8x8_8x16x64x8x8_1x1x64x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_dim(args.out, {8, 16, 32, 16, 16})
+            && check_dim(args.in0, {8, 16, 32, 16, 16})
+            && check_dim(args.in1, {1, 16, 32,  1,  1})) {
+      r = mul_8x16x32x16x16_8x16x32x16x16_1x16x32x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_dim(args.out, {8, 16, 16, 32, 32})
+            && check_dim(args.in0, {8, 16, 16, 32, 32})
+            && check_dim(args.in1, {1, 16, 16,  1,  1})) {
+      r = mul_8x16x16x32x32_8x16x16x32x32_1x16x16x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_dim(args.out, {8, 16, 32, 16, 16})
+            && check_dim(args.in0, {8, 16, 32, 16, 16})
+            && check_dim(args.in1, {1,  1, 32,  1,  1})) {
+      r = mul_8x16x32x16x16_8x16x32x16x16_1x1x32x1x1<float>(args.out, args.in0, args.in1);
+
+    } else if (check_dim(args.out, {8, 16, 16, 32, 32})
+            && check_dim(args.in0, {8, 16, 16, 32, 32})
+            && check_dim(args.in1, {1,  1, 16,  1,  1})) {
+      r = mul_8x16x16x32x32_8x16x16x32x32_1x1x16x1x1<float>(args.out, args.in0, args.in1);
+
+#if 0
+    } else if (check_dim(args.out, {1, 16, 64, 1, 1})
+            && check_dim(args.in0, {1, 16, 64, 1, 1})
+            && check_dim(args.in1, {1, 1, 64, 1, 1})) {
+      r = mul_MxN_1xN_MxN<float, 16, 64>(args.out, args.in1, args.in0);
+    } else if (check_dim(args.out, {1, 16, 16, 1, 1})
+            && check_dim(args.in0, {1, 16, 16, 1, 1})
+            && check_dim(args.in1, {1, 1, 16, 1, 1})) {
+      r = mul_MxN_1xN_MxN<float, 16, 16>(args.out, args.in1, args.in0);
+    } else if (check_dim(args.out, {1, 16, 32, 1, 1})
+            && check_dim(args.in0, {1, 16, 32, 1, 1})
+            && check_dim(args.in1, {1, 1, 32, 1, 1})) {
+      r = mul_MxN_1xN_MxN<float, 16, 32>(args.out, args.in1, args.in0);
+#endif
+    } else if (check_binop_dim5_x(args.out, args.in0, args.in1)) {
       r = binop_dim5_x<float>(args.out, args.in0, args.in1, mul_n1<float>);
     } else if (IsSameDims(args)) {
       r = binop_dimN<float>(args.out, args.in0, args.in1,
@@ -1136,6 +1502,29 @@ int sqdiff2_nn_1n(uint64_t out,
   return 0;
 }
 
+template <typename T>
+int sqdiff_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1(
+        _Tensor const& X, _Tensor const& Y, _Tensor const& Z)
+{
+  LOG(2) << __FUNCTION__;
+  size_t n = 16 * 64 * 8 * 8;
+  T* pX0 = reinterpret_cast<T*>(X.addr);
+  T const* pY0 = reinterpret_cast<T const*>(Y.addr);
+  T const* pZ0 = reinterpret_cast<T const*>(Z.addr);
+#pragma omp parallel for
+  for (size_t i0 = 0; i0 < X.dim_size[0]; ++i0) {
+    T* pX = pX0 + i0 * n;
+    T const* pY = pY0 + i0 * n;
+    T const* pZ = pZ0;
+    for (size_t i = 0; i < n; ++i) {
+      T diff = pY[i] - pZ[i / 64]; 
+      pX[i] = diff * diff;
+    }
+  }
+  LOG(3) << __FUNCTION__ << ": done";
+  return 0;
+}
+
 int op_sqdiff(const BinaryOpArgs& args) {
 
 //  printf("args.in0.dims = %ld\n", args.in0.dims) ;
@@ -1180,7 +1569,11 @@ int op_sqdiff(const BinaryOpArgs& args) {
 			    args.in1.addr,
 			    args.in0.dim_size[0],
 			    args.in0.dim_size[1]) ;
-    } else if (check_binop_dim5_x(args)) {
+    } else if (check_dim(args.out, {8, 16, 64, 8, 8})
+            && check_dim(args.in0, {8, 16, 64, 8, 8})
+            && check_dim(args.in1, {1, 16, 64, 1, 1})) {
+      r = sqdiff_8x16x64x8x8_8x16x64x8x8_1x16x64x1x1<float>(args.out, args.in0, args.in1);
+    } else if (check_binop_dim5_x(args.out, args.in0, args.in1)) {
       r = binop_dim5_x<float>(args.out, args.in0, args.in1, sqdiff_n1<float>);
     } else if (IsSameDims(args)) {
          r = binop_dimN<float>(args.out, args.in0, args.in1,

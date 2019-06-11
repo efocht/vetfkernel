@@ -139,6 +139,7 @@ extern "C" {
     int op_Add(const void* args, size_t len);
     int op_Sub(const void* args, size_t len);
     int op_Mul(const void* args, size_t len);
+    int op_SquaredDifference(const void* args, size_t len);
 }
 
 template<typename T>
@@ -221,6 +222,13 @@ template <typename T>
 int ref_Mul(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z)
 {
   return ref_Binop(X, Y, Z, [](T y, T z) -> T { return y * z; },
+          X.data(), Y.data(), Z.data(), 0);
+}
+
+template <typename T>
+int ref_SquaredDifference(Tensor<T>& X, Tensor<T> const& Y, Tensor<T> const& Z)
+{
+  return ref_Binop(X, Y, Z, [](T y, T z) -> T { return (y - z) * (y - z); },
           X.data(), Y.data(), Z.data(), 0);
 }
 
@@ -327,9 +335,197 @@ bool test_BinaryOp_04(TestParam const& param, F0 f0, F1 f1)
     return test_BinaryOp(param, out, in0, in1, exp, f1);
 }
 
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_05(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({8, 16, 64, 8, 8});
+    Tensor<T> in0({8, 16, 64, 8, 8});
+    Tensor<T> in1({1, 16, 64, 1, 1});
+    Tensor<T> exp({8, 16, 64, 8, 8});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_06(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({8, 16, 64, 8, 8});
+    Tensor<T> in0({8, 16, 64, 8, 8});
+    Tensor<T> in1({1,  1, 64, 1, 1});
+    Tensor<T> exp({8, 16, 64, 8, 8});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_07(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({8, 16, 32, 16, 16});
+    Tensor<T> in0({8, 16, 32, 16, 16});
+    Tensor<T> in1({1, 16, 32,  1,  1});
+    Tensor<T> exp({8, 16, 32, 16, 16});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_08(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({8, 16, 32, 16, 16});
+    Tensor<T> in0({8, 16, 32, 16, 16});
+    Tensor<T> in1({1,  1, 32,  1,  1});
+    Tensor<T> exp({8, 16, 32, 16, 16});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_09(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({1, 16, 64,  1,  1});
+    Tensor<T> in0({1, 16, 64,  1,  1});
+    Tensor<T> in1({1,  1, 64,  1,  1});
+    Tensor<T> exp({1, 16, 64,  1,  1});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_10(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({1, 16, 16,  1,  1});
+    Tensor<T> in0({1, 16, 16,  1,  1});
+    Tensor<T> in1({1,  1, 16,  1,  1});
+    Tensor<T> exp({1, 16, 16,  1,  1});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_11(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({1, 16, 32,  1,  1});
+    Tensor<T> in0({1, 16, 32,  1,  1});
+    Tensor<T> in1({1,  1, 32,  1,  1});
+    Tensor<T> exp({1, 16, 32,  1,  1});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+template<typename T, typename F0, typename F1>
+bool test_BinaryOp_12(TestParam const& param, F0 f0, F1 f1)
+{
+    Tensor<T> out({8, 16, 16, 32, 32});
+    Tensor<T> in0({8, 16, 16, 32, 32});
+    Tensor<T> in1({1,  1, 16,  1,  1});
+    Tensor<T> exp({8, 16, 16, 32, 32});
+
+    for (size_t i = 0; i < out.nelems(); ++i)
+        out.data()[i] = 0;
+
+    for (size_t i = 0; i < in0.nelems(); ++i)
+      in0.data()[i] = (T)drand48();
+
+    for (size_t i = 0; i < in1.nelems(); ++i)
+      in1.data()[i] = (T)drand48();
+
+    f0(exp, in0, in1);
+
+    return test_BinaryOp(param, out, in0, in1, exp, f1);
+}
+
+
+
 bool test_Add_04(TestParam const& param)
 {
   return test_BinaryOp_04<float>(param, ref_Add<float>, op_Add);
+}
+
+bool test_Add_05(TestParam const& param)
+{
+  return test_BinaryOp_05<float>(param, ref_Add<float>, op_Add);
+}
+
+bool test_Add_06(TestParam const& param)
+{
+  return test_BinaryOp_06<float>(param, ref_Add<float>, op_Add);
 }
 
 bool test_Sub_04(TestParam const& param)
@@ -337,9 +533,63 @@ bool test_Sub_04(TestParam const& param)
   return test_BinaryOp_04<float>(param, ref_Sub<float>, op_Sub);
 }
 
+bool test_Sub_05(TestParam const& param)
+{
+  return test_BinaryOp_05<float>(param, ref_Sub<float>, op_Sub);
+}
+
 bool test_Mul_04(TestParam const& param)
 {
   return test_BinaryOp_04<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_05(TestParam const& param)
+{
+  return test_BinaryOp_05<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_06(TestParam const& param)
+{
+  return test_BinaryOp_06<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_07(TestParam const& param)
+{
+  return test_BinaryOp_07<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_08(TestParam const& param)
+{
+  return test_BinaryOp_08<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_09(TestParam const& param)
+{
+  return test_BinaryOp_09<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_10(TestParam const& param)
+{
+  return test_BinaryOp_10<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_11(TestParam const& param)
+{
+  return test_BinaryOp_11<float>(param, ref_Mul<float>, op_Mul);
+}
+
+bool test_Mul_12(TestParam const& param)
+{
+  return test_BinaryOp_12<float>(param, ref_Mul<float>, op_Mul);
+}
+
+
+
+
+bool test_SquaredDifference_05(TestParam const& param)
+{
+  return test_BinaryOp_05<float>(param, ref_SquaredDifference<float>, 
+          op_SquaredDifference);
 }
 
 
@@ -362,8 +612,23 @@ int main(int argc, char* argv[])
         "op_Add_02", test_Add_02,
         "op_Add_03", test_Add_03,
         "op_Add_04", test_Add_04,
+        "op_Add_05", test_Add_05,
+        "op_Add_06", test_Add_06,
+
         "op_Sub_04", test_Sub_04,
+        "op_Sub_05", test_Sub_05,
+
         "op_Mul_04", test_Mul_04,
+        "op_Mul_05", test_Mul_05,
+        "op_Mul_06", test_Mul_06,
+        "op_Mul_07", test_Mul_07,
+        "op_Mul_08", test_Mul_08,
+        "op_Mul_09", test_Mul_09,
+        "op_Mul_10", test_Mul_10,
+        "op_Mul_11", test_Mul_11,
+        "op_Mul_12", test_Mul_12,
+
+        "op_SquaredDifference_05", test_SquaredDifference_05,
     };
 
     TestParam param;
