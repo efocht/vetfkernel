@@ -1,7 +1,1 @@
-## build
-
-see tensorflow/README_ve.md
-
-## run
-
-see samples directory
+See [tensorflow/README_ve.md](https://github.com/sx-aurora-dev/tensorflow/blob/develop/README_ve.md)

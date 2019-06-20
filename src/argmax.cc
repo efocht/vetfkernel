@@ -24,7 +24,7 @@ extern "C" {
 }
 
 
-#define VE_ARGOP_MAX_HANDLE_DIM 3
+#define VE_ARGOP_MAX_HANDLE_DIM 4
 
 //
 // ArgMax
@@ -33,7 +33,7 @@ extern "C" {
 namespace {
 
 template <typename T, typename Index>
-int argmax_10(const T* in, Index* out, const int64_t* dim_size) 
+int argmax_10(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
 
@@ -125,7 +125,7 @@ int argmax_31(const T* in, Index* out, const int64_t* dim_size)
 }
 
 template <typename T, typename Index>
-int argmax_32(const T* in, Index* out, const int64_t* dim_size) 
+int argmax_32(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
   const int64_t d1 = dim_size[1] ;
@@ -145,6 +145,73 @@ int argmax_32(const T* in, Index* out, const int64_t* dim_size)
   }
   return 0 ;
 }
+
+#if 0
+template <typename T, typename Index>
+int argmax_43(const T* in, Index* out, const int64_t* dim_size)
+{
+  const int64_t d0 = dim_size[0] ;
+  const int64_t d1 = dim_size[1] ;
+  const int64_t d2 = dim_size[2] ;
+  const int64_t d3 = dim_size[3] ;
+  int64_t oi, oo, oo0, oo1;
+
+  for(int64_t i0=0; i0<d0; i0++) {
+    oo0 = i0*d1*d2 ;
+    for(int64_t i1=0; i1<d1; i1++) {
+      oo1 = oo0 + i1*d2 ;
+      for(int64_t i2=0; i2<d2; i2++) {
+        oo = oo1 + i2 ;
+        oi = oo*d3 ;
+        Index idx = 0 ;
+#pragma vector
+        for(int64_t i3=0; i3<d3; i3++) {
+          if( in[oi+idx] < in[oi+i3] ) idx = i3 ;
+        }
+        out[oo] = idx ;
+      }
+    }
+  }
+  return 0 ;
+}
+#else
+#define MAXSTRIP 10240
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+template <typename T, typename Index>
+int argmax_43(const T* in, Index* out, const int64_t* dim_size)
+{
+  const int64_t d0 = dim_size[0] ;
+  const int64_t d1 = dim_size[1] ;
+  const int64_t d2 = dim_size[2] ;
+  const int64_t d3 = dim_size[3] ;
+  int64_t osize = d0*d1*d2 ;
+  T omax[MAXSTRIP];
+
+  LOG(2) << "argmax_43" << " begin";
+  for (int64_t i=0; i<osize; i+=MAXSTRIP) {
+    for (int64_t j=0; j<MIN(MAXSTRIP,osize-i); j++) {
+      omax[j] = in[(i+j)*d3] ;
+      out[i+j] = 0;
+    }
+    for(int64_t i3=1; i3<d3; i3++) {
+#pragma _NEC ivdep
+#pragma _NEC packed_vector
+      for (int64_t j=0; j<MIN(MAXSTRIP,osize-i); j++) {
+        if (omax[j] < in[(i+j)*d3+i3]) {
+          out[i+j] = i3 ;
+          omax[j] = in[(i+j)*d3+i3] ;
+        }
+      }
+    }
+  }
+  LOG(2) << "argmax_43" << " end";
+  return 0 ;
+}
+#undef MAXSTRIP
+#undef MIN
+#endif
+
 
 template <typename T, typename Index>
 int argmax(uint64_t in_ptr, uint64_t out_ptr,
@@ -179,8 +246,14 @@ int argmax(uint64_t in_ptr, uint64_t out_ptr,
       ret = argmax_32<T, Index>(in, out, dim_size) ;
     }
   }
-
-  return 0 ;
+  else if( input_dims == 4 ) {
+    if( axis == 3 ) {
+      ret = argmax_43<T, Index>(in, out, dim_size) ;
+    }
+    else
+      ret = 1 ;
+  }
+  return ret ;
 }
 }
 
@@ -237,7 +310,7 @@ int op_ArgMax(const void* args, size_t len)
 namespace {
 
 template <typename T, typename Index>
-int argmin_10(const T* in, Index* out, const int64_t* dim_size) 
+int argmin_10(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
 
@@ -251,7 +324,7 @@ int argmin_10(const T* in, Index* out, const int64_t* dim_size)
 
 
 template <typename T, typename Index>
-int argmin_20(const T* in, Index* out, const int64_t* dim_size) 
+int argmin_20(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
   const int64_t d1 = dim_size[1] ;
@@ -270,7 +343,7 @@ int argmin_20(const T* in, Index* out, const int64_t* dim_size)
 }
 
 template <typename T, typename Index>
-int argmin_21(const T* in, Index* out, const int64_t* dim_size) 
+int argmin_21(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
   const int64_t d1 = dim_size[1] ;
@@ -288,7 +361,7 @@ int argmin_21(const T* in, Index* out, const int64_t* dim_size)
 }
 
 template <typename T, typename Index>
-int argmin_30(const T* in, Index* out, const int64_t* dim_size) 
+int argmin_30(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
   const int64_t d1 = dim_size[1] ;
@@ -309,7 +382,7 @@ int argmin_30(const T* in, Index* out, const int64_t* dim_size)
 }
 
 template <typename T, typename Index>
-int argmin_31(const T* in, Index* out, const int64_t* dim_size) 
+int argmin_31(const T* in, Index* out, const int64_t* dim_size)
 {
   const int64_t d0 = dim_size[0] ;
   const int64_t d1 = dim_size[1] ;
@@ -350,6 +423,69 @@ int argmin_32(const T* in, Index* out, const int64_t* dim_size)
   return 0 ;
 }
 
+#if 0
+template <typename T, typename Index>
+int argmin_43(const T* in, Index* out, const int64_t* dim_size)
+{
+  const int64_t d0 = dim_size[0] ;
+  const int64_t d1 = dim_size[1] ;
+  const int64_t d2 = dim_size[2] ;
+  const int64_t d3 = dim_size[3] ;
+  int64_t oi, oo, oo0, oo1;
+
+  for(int64_t i0=0; i0<d0; i0++) {
+    oo0 = i0*d1*d2 ;
+    for(int64_t i1=0; i1<d1; i1++) {
+      oo1 = oo0 + i1*d2 ;
+      for(int64_t i2=0; i2<d2; i2++) {
+        oo = oo1 + i2 ;
+        oi = oo * d3 ;
+        Index idx = 0 ;
+#pragma vector
+        for(int64_t i3=0; i3<d3; i3++) {
+          if( in[oi+idx] > in[oi+i3] ) idx = i3 ;
+        }
+        out[oo] = idx ;
+      }
+    }
+  }
+  return 0 ;
+}
+#else
+#define MAXSTRIP 10240
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+template <typename T, typename Index>
+int argmin_43(const T* in, Index* out, const int64_t* dim_size)
+{
+  const int64_t d0 = dim_size[0] ;
+  const int64_t d1 = dim_size[1] ;
+  const int64_t d2 = dim_size[2] ;
+  const int64_t d3 = dim_size[3] ;
+  int64_t osize = d0*d1*d2 ;
+  T omax[MAXSTRIP];
+
+  for (int64_t i=0; i<osize; i+=MAXSTRIP) {
+    for (int64_t j=0; j<MIN(MAXSTRIP,osize-i); j++) {
+      omax[j] = in[(i+j)*d3] ;
+      out[i+j] = 0;
+    }
+    for(int64_t i3=1; i3<d3; i3++) {
+#pragma _NEC ivdep
+#pragma _NEC packed_vector
+      for (int64_t j=0; j<MIN(MAXSTRIP,osize-i); j++) {
+        if (omax[j] > in[(i+j)*d3+i3]) {
+          out[i+j] = i3 ;
+          omax[j] = in[(i+j)*d3+i3] ;
+        }
+      }
+    }
+  }
+  return 0 ;
+}
+#undef MAXSTRIP
+#endif
+
 template <typename T, typename Index>
 int argmin(uint64_t in_ptr, uint64_t out_ptr,
            int64_t axis, int64_t input_dims, int64_t* dim_size)
@@ -383,8 +519,14 @@ int argmin(uint64_t in_ptr, uint64_t out_ptr,
       ret = argmin_32<T, Index>(in, out, dim_size) ;
     }
   }
-
-  return 0 ;
+  else if( input_dims == 4 ) {
+    if( axis == 3 ) {
+      ret = argmin_43<T, Index>(in, out, dim_size) ;
+    }
+    else
+      ret = 1 ;
+  }
+  return ret ;
 }
 }
 
