@@ -1128,6 +1128,14 @@ int op_notEqual(const BinaryOpArgs& args) {
       return notEqual_nn<float>(args.out.addr, args.in0.addr, args.in1.addr,
                               args.in0.nelems);
     }
+    else if (args.in0.nelems == 1 ) {
+      return notEqual_n1<float>(args.out.addr, args.in1.addr, args.in0.addr,
+                             args.in1.nelems);
+    }
+    else {
+      LOG(2) << __FUNCTION__ << " parameter combination not supported on VE.";
+      return 1;
+    }
   }
   
   return 1;
